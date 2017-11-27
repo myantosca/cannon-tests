@@ -1,27 +1,33 @@
-FNAME_BASE=COSC-6365-MichaelYantosca-FinalProjectProposal
+PROPOSAL_FNAME_BASE=COSC-6365-MichaelYantosca-FinalProjectProposal
+REPORT_FNAME_BASE=COSC-6365-MichaelYantosca-FinalProjectReport
 
 all: docs
 
-docs: $(FNAME_BASE).pdf
+docs: $(PROPOSAL_FNAME_BASE).pdf $(REPORT_FNAME_BASE).pdf
 
-$(FNAME_BASE).pdf: $(FNAME_BASE).tex
-	@lualatex -shell-escape $(FNAME_BASE).tex
-	@biber $(FNAME_BASE)
-	@lualatex -shell-escape $(FNAME_BASE).tex
+%.pdf: %.tex %.bib
+	@lualatex -shell-escape $*.tex
+	@biber $*
+	@lualatex -shell-escape $*.tex
 
-superclean: clean
-	rm -f $(FNAME_BASE).pdf
+superclean: clean superclean-doc-$(PROPOSAL_FNAME_BASE) superclean-doc-$(REPORT_FNAME_BASE)
 
-clean:
-	@rm -f $(FNAME_BASE).aux
-	@rm -f $(FNAME_BASE).bbl
-	@rm -f $(FNAME_BASE).bcf
-	@rm -f $(FNAME_BASE).log
-	@rm -f $(FNAME_BASE).run.xml
-	@rm -f $(FNAME_BASE).dvi
-	@rm -f $(FNAME_BASE).blg
-	@rm -f $(FNAME_BASE).auxlock
-	@rm -f $(FNAME_BASE).pyg
-	@rm -f $(FNAME_BASE)-figure*
-	@rm -f $(FNAME_BASE).toc
+superclean-doc-%:
+	rm -f $*.pdf
+
+clean: clean-doc-$(PROPOSAL_FNAME_BASE) clean-doc-$(REPORT_FNAME_BASE)
 	@rm -f *~
+
+clean-doc-%: 
+	@rm -f $*.aux
+	@rm -f $*.bbl
+	@rm -f $*.bcf
+	@rm -f $*.log
+	@rm -f $*.run.xml
+	@rm -f $*.dvi
+	@rm -f $*.blg
+	@rm -f $*.auxlock
+	@rm -f $*.pyg
+	@rm -f $*-figure*
+	@rm -f $*.toc
+
