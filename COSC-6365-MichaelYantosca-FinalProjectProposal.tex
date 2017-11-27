@@ -1,0 +1,59 @@
+\documentclass{article}
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage{fancyhdr}
+\usepackage[utf8]{luainputenc}
+\usepackage[bibencoding=utf8,backend=biber]{biblatex}
+\addbibresource{COSC-6365-MichaelYantosca-FinalProjectProposal.bib}
+\pagestyle{fancy}
+\fancyhf{}
+\rhead{COSC-6365 Final Project Proposal}
+\lhead{Michael Yantosca}
+\rfoot{\thepage}
+
+\begin{document}
+\begin{section}{Abstract}
+  To explore the relative merits between single-node computer power in depth versus multi-node compute power in breadth,
+  I propose an experiment comparing the performance and efficiency of Cannon's algorithm\autocites{Lecture17Slides,GuptaSadayappan} for the matrix multiplication
+  problem $C = A \times B$ between a single-node OpenMP implementation utilizing accelerators and a multi-node MPI
+  implementation spread across a cluster.
+  \begin{subsection}{Data}
+    For the sake of time, I will only consider the $C$-stationary case for a limited number of matrix sizes
+    (256x256, 1024x1024, 4096x4096, 16384x16384, 256x1024, 256x4096, 256x16384, 16384x256, 16384x256, 4096x256, 1024x256).
+    The matrices will be filled with random numbers for the performance trials. Validation trials will be made
+    through specially devised matrices $A$ and $B$ such that each cell of the product matrix $C$ will have a unique value.
+  \end{subsection}
+  \begin{subsection}{Resources}
+    The OpenMP trials will be executed on the GPU nodes on BRIDGES\footnote{If the GPU nodes on BRIDGES do not support
+    OpenMP offloading to the P100 and K80 GPUs, the acceleration will be done via OpenACC, or, as a last resort, CUDA.}
+    and/or the KNL nodes on STAMPEDE2, whereas the MPI trials will be executed on the appropriate non-accelerated nodes
+    on BRIDGES.
+  \end{subsection}
+  \begin{subsection}{Efficiency}
+    The efficiency of the MPI trials will be gauged against a strong-scaling roofline model based on the physical
+    characteristics of a single non-GPU node on BRIDGES. The processor in this case is the 28-core, 2.30 GHz Intel E5-2695,
+    which is theoretically capable of 2.30 GHz * 28 cores * 4 SIMD instructions/cycle (AVX256) = 257.6 GFLOPs/s/node.
+    \begin{paragraph}{}
+      The efficiency of the OpenMP trials will be gauged against a roofline model based on the physical characteristics of the accelerator.
+      The NVIDIA P100 is theoretically capable of 9.3 SP TFLOPs/s/card\autocite{P100Datasheet}, whereas the NVIDIA K80 is theoretically capable of
+      8.74 TFLOPs/s/card\autocite{AnandtechK80}. In the event that KNL nodes on STAMPEDE2 are utilized, the theoretical roofline will
+      be considered as 1.4 GHz * 68 cores * 8 SIMD instructions/cycle (AVX512) = 761.6 GFLOPs/s/node\autocite{Stampede2UserGuide}\footnote{While KNL supports 4 threads/core, only 1 is considered here as performance may degrade over shared resources.}.
+    \end{paragraph}
+    \begin{paragraph}{}
+      The matrix multiplication functions provided with the Intel Math Kernel Library (MKL) will be consulted as a reference for empirically
+      achievable single-node performance either without GPU acceleration or in the case of KNL nodes while the matrix multiplication sample provided
+      by the CUDA toolkit utilizing CUBLAS functions will be consulted as a reference for empirically achievable single-node performance
+      with GPU acceleration.
+    \end{paragraph}
+  \end{subsection}
+  \begin{subsection}{Hypotheses}
+    I predict that the accelerated OpenMP solution will outperform the MPI solution for smaller matrix sizes until
+    reaching an inflection point where the contention between resources within the node is a greater bottleneck than
+    the communication overhead across multiple nodes. This inflection point will largely depend on the architecture
+    and layout of the accelerator used, i.e., the dimensions of the various hierarchical groupings of its compute resources.
+  \end{subsection}
+\end{section}
+
+\printbibliography
+
+\end{document}
