@@ -1,3 +1,9 @@
+# This software contains source code provided by NVIDIA Corporation.
+
+# Modifications have been made to this Makefile for the purpose of consolidating
+# the source and common header files for easier compilation on a remote compute
+# cluster environment. - myantosca 2017-11-27
+
 ################################################################################
 #
 # Copyright 1993-2015 NVIDIA Corporation.  All rights reserved.
@@ -204,7 +210,10 @@ ALL_LDFLAGS += $(addprefix -Xlinker ,$(LDFLAGS))
 ALL_LDFLAGS += $(addprefix -Xlinker ,$(EXTRA_LDFLAGS))
 
 # Common includes and paths for CUDA
-INCLUDES  := -I../../common/inc
+# Common header files have been copied to the same directory as the source
+# to make the code more portable across different compute cluster environments.
+# -myantosca 2017-11-27
+INCLUDES  := -I. #-I../../common/inc
 LIBRARIES :=
 
 ################################################################################
