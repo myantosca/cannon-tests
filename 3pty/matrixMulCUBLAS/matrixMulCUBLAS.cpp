@@ -149,7 +149,7 @@ void printDiff(float *data1, float *data2, int width, int height, int iListLengt
     fprintf(stderr, " \n  Total Errors = %d\n", error_count);
 }
 
-void initializeCUDA(int argc, char **argv, int &devID, int &mSizeMultiple, int &nSizeMultiple, sMatrixSize &matrix_size)
+void initializeCUDA(int argc, char **argv, int &devID, int &m, int &q, int &n, sMatrixSize &matrix_size)
 {
     // By default, we use device 0, otherwise we override the device ID based on what is provided at the command line
     cudaError_t error;
@@ -177,23 +177,23 @@ void initializeCUDA(int argc, char **argv, int &devID, int &mSizeMultiple, int &
     }
 
 
-    // Multiplication factor for M dimension. - myantosca 2017-11-27
-    if (checkCmdLineFlag(argc, (const char **)argv, "mmult"))
+    // m dimension. - myantosca 2017-12-02
+    if (checkCmdLineFlag(argc, (const char **)argv, "m"))
     {
-        mSizeMultiple = getCmdLineArgumentInt(argc, (const char **)argv, "mmult");
+        m = getCmdLineArgumentInt(argc, (const char **)argv, "m");
     }
 
-    mSizeMultiple = min(mSizeMultiple, 64);
-    mSizeMultiple = max(mSizeMultiple, 1);
-
-    // Multiplication factor for N dimension. - myantosca 2017-11-27
-    if (checkCmdLineFlag(argc, (const char **)argv, "nmult"))
+    // q dimension. - myantosca 2017-12-02
+    if (checkCmdLineFlag(argc, (const char **)argv, "q"))
     {
-        nSizeMultiple = getCmdLineArgumentInt(argc, (const char **)argv, "nmult");
+        q = getCmdLineArgumentInt(argc, (const char **)argv, "q");
     }
 
-    nSizeMultiple = min(nSizeMultiple, 64);
-    nSizeMultiple = max(nSizeMultiple, 1);
+    // n dimension. - myantosca 2017-12-02
+    if (checkCmdLineFlag(argc, (const char **)argv, "n"))
+    {
+        n = getCmdLineArgumentInt(argc, (const char **)argv, "n");
+    }
 
     cudaDeviceProp deviceProp;
 
@@ -210,13 +210,13 @@ void initializeCUDA(int argc, char **argv, int &devID, int &mSizeMultiple, int &
     // use a larger block size for Fermi and above
     int block_size = (deviceProp.major < 2) ? 16 : 32;
 
-    // Use multiples of 256 in both dimensions per original project proposal. - myantosca 2017-11-27
-    matrix_size.uiWA = 256 * nSizeMultiple;
-    matrix_size.uiHA = 256 * mSizeMultiple;
-    matrix_size.uiWB = 256 * mSizeMultiple;
-    matrix_size.uiHB = 256 * nSizeMultiple;
-    matrix_size.uiWC = 256 * mSizeMultiple;
-    matrix_size.uiHC = 256 * mSizeMultiple;
+    // Use m, q, and n arguments as matrix dimensions. - myantosca 2017-11-27
+    matrix_size.uiWA = q;
+    matrix_size.uiHA = m;
+    matrix_size.uiWB = n;
+    matrix_size.uiHB = q;
+    matrix_size.uiWC = m;
+    matrix_size.uiHC = n;
 
     fprintf(stderr, "MatrixA(%u,%u), MatrixB(%u,%u), MatrixC(%u,%u)\n",
            matrix_size.uiHA, matrix_size.uiWA,
@@ -257,6 +257,9 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
 
     // set seed for rand()
     srand(2006);
+    int q = matrix_size.uiWA;
+    int m = matrix_size.uiHC;
+    int n = matrix_size.uiWC;
 
     // initialize host memory
     randomInit(h_A, size_A);
@@ -390,10 +393,10 @@ int main(int argc, char **argv)
     fprintf(stderr, "[Matrix Multiply CUBLAS] - Starting...\n");
 
     // Added multiplication factors for both M and N dimensions in MxN * N*M problem. - myantosca 2017-11-27
-    int devID = 0, mMult = 1, nMult = 1;
+    int devID = 0, m = 256, q = 256, n = 256;
     sMatrixSize matrix_size;
 
-    initializeCUDA(argc, argv, devID, mMult, nMult, matrix_size);
+    initializeCUDA(argc, argv, devID, m, q, n, matrix_size);
 
     int matrix_result = matrixMultiply(argc, argv, devID, matrix_size);
 
