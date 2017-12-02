@@ -211,12 +211,12 @@ void initializeCUDA(int argc, char **argv, int &devID, int &mSizeMultiple, int &
     int block_size = (deviceProp.major < 2) ? 16 : 32;
 
     // Use multiples of 256 in both dimensions per original project proposal. - myantosca 2017-11-27
-    matrix_size.uiWA = 256 * mSizeMultiple;
-    matrix_size.uiHA = 256 * nSizeMultiple;
-    matrix_size.uiWB = 256 * nSizeMultiple;
-    matrix_size.uiHB = 256 * mSizeMultiple;
-    matrix_size.uiWC = 256 * nSizeMultiple;
-    matrix_size.uiHC = 256 * nSizeMultiple;
+    matrix_size.uiWA = 256 * nSizeMultiple;
+    matrix_size.uiHA = 256 * mSizeMultiple;
+    matrix_size.uiWB = 256 * mSizeMultiple;
+    matrix_size.uiHB = 256 * nSizeMultiple;
+    matrix_size.uiWC = 256 * mSizeMultiple;
+    matrix_size.uiHC = 256 * mSizeMultiple;
 
     fprintf(stderr, "MatrixA(%u,%u), MatrixB(%u,%u), MatrixC(%u,%u)\n",
            matrix_size.uiHA, matrix_size.uiWA,
