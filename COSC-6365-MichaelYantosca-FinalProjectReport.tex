@@ -59,19 +59,19 @@
     Before commencing on the actual implementation of the matrix multiplication programs, it was determined that the design of
     the validation trials would take first priority so as to catch errors in implementation earlier rather than later.
     The validation mechanism itself needed to operate under several exacting constraints. It has been already mentioned
-    that the $m \times m$ product matrix $C$ in validation mode would need to house a unique value in each cell once calculations had finished.
-    This was to ensure that every dot product of each row in $m \times n$ matrix $A$ and each column in $n \times m$ matrix $B$ did not suffer corruption
+    that the $m \times n$ product matrix $C$ in validation mode would need to house a unique value in each cell once calculations had finished.
+    This was to ensure that every dot product of each row in $m \times q$ matrix $A$ and each column in $q \times n$ matrix $B$ did not suffer corruption
     from any other dot products or other implementation errors by providing a quick reference that could be used as a sanity check.
   \end{paragraph}
   \begin{paragraph}{}
     Alacrity in the validation implementation was key. If the validation required additional extended calculations to replicate the results serially,
-    the time to find and correct errors could become prohibitively slow, especially as the matrix dimensions $m$ and $n$ increased.
+    the time to find and correct errors could become prohibitively slow, especially as the matrix dimensions $m$, $q$, and $n$ increased.
     Ideally, the validation would be a constant time function $f$ based on the row and column index of the cell in question, i.e.,
     $C_{i,j} = f(i,j)$.
   \end{paragraph}
   \begin{paragraph}{}
     The under-the-hood 1D row-major ordering and indexing of 2D matrices in the C programming language provided the requisite inspiration.
-    The cell of every 2D matrix in C is accessed implicitly by the following formula: $in +j$, where $i$ is the row index,
+    The cell of every 2D matrix in C is accessed implicitly by the following formula: $iq +j$, where $i$ is the row index,
     $j$ is the column index, and $n$ is the number of columns\autocite[][113]{KnR}. Initial attempts sough to find some function $f(i,j) = \displaystyle\sum_{k=1}^{N} A_{i,k} \cdot B_{k,j}$
     such that the matrix $A$ independently provided the $i$ component while the matrix $B$ independently provided the $j$ component.
   \end{paragraph}
@@ -84,21 +84,23 @@
   \end{paragraph}
   \begin{paragraph}{}
     While this satisfies the desired formula $in + j$ per cell, it does not provide a checksum against column drift
-    since $B$ is simply a homogeneous field of ones. The basic principle can be improved as follows. Let each cell of the matrix
+    since $B$ is simply a homogeneous field of ones. The basic principle could be improved as follows. Let each cell of the matrix
     $A$ be populated with the value $i + 1$. Let each cell of the matrix $B$ be populated with the value $j$. If a basis
-    of $C_{0}$ = \textbf{0} is assumed, each cell of the product matrix $C$ will contain the value $n(i + 1)j$, which expands to
-    $nij + nj$. By setting the basis matrix $C_{0}$ so that each cell contains $-((n-1)j + (j-1)in)$ , each cell of the product matrix $C$
-    will then contain the desired value $in + j$. This is a relatively safe method for obtaining the desired value since there are no
+    of $C_{0}$ = \textbf{0} is assumed, each cell of the product matrix $C$ will contain the value $q(i + 1)j$, which expands to
+    $qij + qj$. By setting the basis matrix $C_{0}$ so that each cell contains $-((q-1)j + (j-1)iq)$ , each cell of the product matrix $C$
+    will then contain the desired value $iq + j$. This is a relatively safe method for obtaining the desired value since there are no
     division operations required.
   \end{paragraph}
   \begin{paragraph}{}
-    The problem with this latest refinement and even all the previous refinements is that the resultant values do no fit within the range of precise integral
+    The problem with this latest refinement and even all the previous refinements is that the resultant values did not fit within the range of precise integral
     values available in single-precision floating point, i.e., [$-2^{24}$,$2^{24}$]\autocite{SPIntLimit}, given the target matrix sizes. The validation
-    method needs to be able to precisely support values as high as $16383 \times 16383 + 16382 \times 16383 \times 16384$, or something on the order
-    of $2^{42}$. Under the assumption that single-precision floating point has enough precision to represent down to $\frac{1}{256}$ exactly so long as the
-    denominator is 256 in all cases, multiplying the values $i$, $j$, and $n$ by $\frac{1}{256} = 0.00390625$ compresses the range down to [0,$2^{18}$].
-    With this regimen, each cell of $A$ will contain the value $\frac{i+1}{256}$, each cell of $B$ will contain the value $\frac{j}{256}$, and
-    each cell of $C_{0}$ will contain the value $-\frac{(n-1)j + (j-1)in}{256}$ so that each cell of the product matrix $C$ will contain the value $\frac{in + j}{256}$.
+    method needed to be able to precisely support values as high as $16383 \times 16383 + 16382 \times 16383 \times 16384$, or something on the order
+    of $2^{42}$. Several attempts to compress the range by reducing $i$ and $j$ failed to produce the desired results and only complicated the requisite
+    basis matrix $C_{0}$ with no guarantee of precision fidelity.
+  \end{paragraph}
+  \begin{paragraph}{}
+    Furthermore, the previous equation made an untenable assumption in view of the proposed target matrix sizes. The inner dimension $q$ is not
+    necessarily equal to the final column dimension $n$ of the matrix $C$. Such an invariant only holds if the matrices $A$ and $B$ are square.
   \end{paragraph}
  \end{section}
 
