@@ -59,6 +59,7 @@
 
 // Utilities and system includes
 #include <assert.h>
+#include <sys/time.h> // for timing host/device transfers
 #include <helper_string.h>  // helper for shared functions common to CUDA Samples
 
 // CUDA runtime
@@ -297,12 +298,17 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
     // allocate device memory
     float *d_A, *d_B, *d_C;
 
+    long long int t_comm = 0;
+    struct timeval tv_h2d_a, tv_h2d_b, tv_d2h_a, tv_d2h_b;
+    gettimeofday(&tv_h2d_a, NULL);
     checkCudaErrors(cudaMalloc((void **) &d_A, mem_size_A));
     checkCudaErrors(cudaMalloc((void **) &d_B, mem_size_B));
     checkCudaErrors(cudaMemcpy(d_A, h_A, mem_size_A, cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMemcpy(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMalloc((void **) &d_C, mem_size_C));
 
+    gettimeofday(&tv_h2d_b, NULL);
+    t_comm += 1000000LL * (tv_h2d_b.tv_sec - tv_h2d_a.tv_sec) + tv_h2d_b.tv_usec - tv_h2d_a.tv_usec;
     // setup execution parameters
     dim3 threads(block_size, block_size);
     dim3 grid(matrix_size.uiWC / threads.x, matrix_size.uiHC / threads.y);
@@ -361,10 +367,14 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
             msecPerMatrixMul,
             flopsPerMatrixMul);
 
-	fprintf(stdout, "%.2f,%.3f,%.0f\n", gigaFlops, msecPerMatrixMul, flopsPerMatrixMul);
         // copy result from device to host
+	gettimeofday(&tv_d2h_a, NULL);
         checkCudaErrors(cudaMemcpy(h_CUBLAS, d_C, mem_size_C, cudaMemcpyDeviceToHost));
+	gettimeofday(&tv_d2h_b, NULL);
+	t_comm += 1000000LL * (tv_d2h_b.tv_sec - tv_d2h_a.tv_sec) + tv_d2h_b.tv_usec - tv_d2h_a.tv_usec;
 
+	fprintf(stdout, "%d,%d,%d,%.2f,%.0f,%.3f,%.6f\n",
+		m, q, n, gigaFlops, flopsPerMatrixMul, msecPerMatrixMul, float(t_comm) * 0.001);
         // Destroy the handle
         checkCudaErrors(cublasDestroy(handle));
     }
