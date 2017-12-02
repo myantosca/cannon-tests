@@ -260,15 +260,39 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
     float *h_C      = (float *) malloc(mem_size_C);
     float *h_CUBLAS = (float *) malloc(mem_size_C);
 
-    // set seed for rand()
-    srand(2006);
+    int validation = 0;
     int q = matrix_size.uiWA;
     int m = matrix_size.uiHC;
     int n = matrix_size.uiWC;
 
-    // initialize host memory
-    randomInit(h_A, size_A);
-    randomInit(h_B, size_B);
+    if (checkCmdLineFlag(argc, (const char **)argv, "validation"))
+    {
+        validation = getCmdLineArgumentInt(argc, (const char **)argv, "validation");
+    }
+
+    if (!validation)
+    {
+        // set seed for rand()
+        srand(2006);
+
+        // initialize host memory
+        randomInit(h_A, size_A);
+        randomInit(h_B, size_B);
+    }
+    else
+    {
+      int i, j;
+        for (i = 0; i < m; i++) {
+	  for (j = 0; j < q; j++) {
+	    h_A[i * q + j] = 1;
+	  }
+	}
+        for (i = 0; i < q; i++) {
+	  for (j = 0; j < n; j++) {
+	    h_B[i * n + j] = 1;
+	  }
+	}
+    }
 
     // allocate device memory
     float *d_A, *d_B, *d_C;
@@ -356,12 +380,20 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
     // check result (CUBLAS)
     // bool resCUBLAS = sdkCompareL2fe(reference, h_CUBLAS, size_C, 1.0e-6f);
     bool resCUBLAS = true;
+    if (validation) {
+      int i,j;
+      for (i = 0; i < matrix_size.uiHC; i++) {
+	for (j = 0; j < matrix_size.uiWC; j++) {
+	  resCUBLAS &= (h_CUBLAS[i * matrix_size.uiWC + j] == n);
+	}
+      }
+    }
     // if (resCUBLAS != true)
     // {
     //     printDiff(reference, h_CUBLAS, matrix_size.uiWC, matrix_size.uiHC, 100, 1.0e-5f);
     // }
 
-    // fprintf(stderr, "Comparing CUBLAS Matrix Multiply with CPU results: %s\n", (true == resCUBLAS) ? "PASS" : "FAIL");
+    if (validation) fprintf(stderr, "Comparing CUBLAS Matrix Multiply with CPU results: %s\n", (true == resCUBLAS) ? "PASS" : "FAIL");
 
     fprintf(stderr, "\nNOTE: The CUDA Samples are not meant for performance measurements. Results may vary when GPU Boost is enabled.\n");
 
