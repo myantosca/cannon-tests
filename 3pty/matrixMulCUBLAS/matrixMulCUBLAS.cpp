@@ -254,6 +254,11 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
     unsigned int size_B = matrix_size.uiWB * matrix_size.uiHB;
     unsigned int mem_size_B = sizeof(float) * size_B;
     float *h_B = (float *)malloc(mem_size_B);
+    // allocate host memory for the result
+    unsigned int size_C = matrix_size.uiWC * matrix_size.uiHC;
+    unsigned int mem_size_C = sizeof(float) * size_C;
+    float *h_C      = (float *) malloc(mem_size_C);
+    float *h_CUBLAS = (float *) malloc(mem_size_C);
 
     // set seed for rand()
     srand(2006);
@@ -267,12 +272,6 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
 
     // allocate device memory
     float *d_A, *d_B, *d_C;
-    unsigned int size_C = matrix_size.uiWC * matrix_size.uiHC;
-    unsigned int mem_size_C = sizeof(float) * size_C;
-
-    // allocate host memory for the result
-    float *h_C      = (float *) malloc(mem_size_C);
-    float *h_CUBLAS = (float *) malloc(mem_size_C);
 
     checkCudaErrors(cudaMalloc((void **) &d_A, mem_size_A));
     checkCudaErrors(cudaMalloc((void **) &d_B, mem_size_B));
