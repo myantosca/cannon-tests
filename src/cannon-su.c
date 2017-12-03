@@ -168,14 +168,84 @@ int main(int argc, char *argv[]) {
     printf("\n");
   }
 
-  // Phase 2: Cycle through the blocks and multiply the blocks, shifting A left and B up by one block each iteration.
-  // TODO
+  // Phase 2: Cycle through the blocks and multiply the blocks, shifting A left and B up (technically, left) by one block each iteration.
+  size_t d;
+  for (d = 0; d < c; d++) {
+    // Multiply all the blocks for the present iteration.
+    for (x = 0; x < b; x++) {
+      for (y = 0; y < c; y++) {
+	// Block multiply A(x,y) by B(x,y).
+	for (i = 0; i < u; i++) {
+	  for (k = 0; k < v; k++) {
+	    for (j = 0; j < w; j++) {
+	      dC[x * u * n + i * n + y * w + j] += dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k] * dB[y * (n+w) * v + k * (n+w) + (x+1) * w + j]; 
+	    }
+	  }
+	}
+      }
+    }
+    // Cycle A and B.
+    for (x = 0; x < b; x++) {
+      for (y = 1; y <= c+1; y++) {
+	// Shift A(x,y) to the left 1 block.
+	omp_target_memcpy_rect(dA, dA,                                               // dst, src
+			       sizeof(float),                                        // elem size
+			       2,                                                    // dims
+			       (const size_t[2]){ u, v },                            // volume
+			       (const size_t[2]){ x * u, ((y - 1) % (c+1)) * v },    // dst offs
+			       (const size_t[2]){ x * u, (y % (c+1)) * v },          // src offs
+			       (const size_t[2]){ b * u, (c + 1) * v },              // dst dims
+			       (const size_t[2]){ b * u, (c + 1) * v },              // src dims
+			       target_device,                                        // dst device
+			       target_device);                                       // src device
+	// Shift B(x,y) up (to the left) 1 block.
+	omp_target_memcpy_rect(dB, dB,                                               // dst, src
+			       sizeof(float),                                        // elems
+			       2,                                                    // dims
+			       (const size_t[2]){ v, w },                            // volume
+			       (const size_t[2]){ x * v, ((y - 1) % (c+1)) * w },    // dst offs
+			       (const size_t[2]){ x * v, (y % (c+1)) * w },          // src offs
+			       (const size_t[2]){ b * v, (c + 1) * w },              // dst dims
+			       (const size_t[2]){ b * v, (c + 1) * w },              // src dims
+			       target_device,                                        // dst device
+			       target_device);                                       // src device
+      }
+    }
+    printf("[%lu] dA = \n", d);
+    for (i = 0; i < m; i++) {
+      for (j = 0; j < q + v; j++) {
+	printf("%f ", dA[i * (q + v) + j]);
+      }
+      printf("\n");
+    }
+    printf("[%lu] dB = \n", d);
+    for (i = 0; i < q; i++) {
+      for (j = 0; j < n + w; j++) {
+	printf("%f ", dB[i * (n + w) + j]);
+      }
+      printf("\n");
+    }
+  }
 
   // Copy results from device back to host.
   omp_target_memcpy(C, dC, m * n * sizeof(float), 0, 0, host_device, target_device);
 
+  printf("C = \n");
+  for (i = 0; i < m; i++) {
+    for (j = 0; j < n; j++) {
+      printf("%f ", C[i * n + j]);
+    }
+    printf("\n");
+  }
+
   // Report timing results.
   // TODO
 
+  if (A) free(A);
+  if (B) free(B);
+  if (C) free(C);
+  if (dA) omp_target_free(dA, target_device);
+  if (dB) omp_target_free(dB, target_device);
+  if (dC) omp_target_free(dC, target_device);
   return 0;
 }
