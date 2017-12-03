@@ -7,7 +7,7 @@
 #include <mkl.h>
 
 int main(int argc, char *argv[]) {
-  int a = 1, m = 256, q = 256, n = 256;
+  int a = 1, m = 256, q = 256, n = 256, s = 30;
   float *A = NULL, *B = NULL, *C = NULL;
 
   while (a < argc) {
@@ -22,6 +22,10 @@ int main(int argc, char *argv[]) {
     if (!strcmp("-n", argv[a])) {
       a++;
       if (a < argc) sscanf(argv[a], "%d", &n);
+    }
+    if (!strcmp("-s", argv[a])) {
+      a++;
+      if (a < argc) sscanf(argv[a], "%d", &s);
     }
     a++;
   }
@@ -43,16 +47,22 @@ int main(int argc, char *argv[]) {
     }
   }
 
+  fprintf(stdout, "m,q,n,s,r,r_iter,t_iter\n");
   struct timeval tv_a;
   struct timeval tv_b;
+  long long int t_total = 0;
+  int u;
+  for (u = 0; u < s; u++) {
+    gettimeofday(&tv_a, NULL);
+    cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, n, q, 1, A, q, B, n, 0, C, n);
+    gettimeofday(&tv_b, NULL);
+    t_total += 1000000LL * (tv_b.tv_sec - tv_a.tv_sec) + tv_b.tv_usec - tv_a.tv_usec;
+  }
 
-  gettimeofday(&tv_a, NULL);
-  cblas_sgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, m, n, q, 1, A, q, B, n, 0, C, n);
-  gettimeofday(&tv_b, NULL);
-
-  long long int t_us = 1000000LL * (tv_b.tv_sec - tv_a.tv_sec) + tv_b.tv_usec - tv_a.tv_usec;
-
-  fprintf(stderr, "%d,%d,%d,%lld\n", m, q, n, t_us);
+  double r_iter = 2.0 * m * n * q;
+  double t_iter = (double)t_total * 0.001 / (double)s;
+  double r = r_iter * 1.0e-9 / (t_iter * 0.001);
+  fprintf(stdout, "%d,%d,%d,%d,%.2lf,%.3lf,%.3lf\n", m, q, n, s, r, r_iter, t_iter);
 
   if (A) free(A);
   if (B) free(B);
