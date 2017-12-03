@@ -2,6 +2,7 @@
 \usepackage{mathtools}
 \usepackage{amssymb}
 \usepackage{fancyhdr}
+\usepackage{alltt}
 \usepackage[utf8]{luainputenc}
 \usepackage[bibencoding=utf8,backend=biber]{biblatex}
 \addbibresource{COSC-6365-MichaelYantosca-FinalProjectReport.bib}
@@ -102,7 +103,61 @@
     Furthermore, the previous equation made an untenable assumption in view of the proposed target matrix sizes. The inner dimension $q$ is not
     necessarily equal to the final column dimension $n$ of the matrix $C$. Such an invariant only holds if the matrices $A$ and $B$ are square.
   \end{paragraph}
- \end{section}
+\end{section}
+
+\begin{section}{Empirical Rooflines}
+  In order to get a gauge for the current state of the art as regards matrix multiplication, it was necessary to develop a couple of test harnesses.
+  These harnesses could provide a reasonable estimate of what performance and efficiency would be achievable within the bounds of the peak theoretical
+  rooflines. Because of the difference in architectures between the scale-up and scale-out cases, at least two harnesses would need to be developed.
+  \begin{subsection}{Scale-Up}
+    \begin{paragraph}{}
+      For the GPU offloading or scale-up case, the NVIDIA CUBLAS library was selected as the empirical roofline model. It is assumed that the development
+      staff at NVIDIA has a more intimate knowledge of the NVIDIA P100 and NVIDIA K80 platforms than the general public and therefore should be better
+      equipped to maximize resource utilization for those architectures.
+    \end{paragraph}
+    \begin{paragraph}{}
+      The \texttt{matrixMulCUBLAS} sample source provided with CUDA Toolkit 8.0 served as the basis for the CUBLAS test harness. Some minor modifications
+      were made to the command-line arguments to support a wider array of target matrix sizes as the original source hardcoded the dimensions based on a single
+      multiplier. The \texttt{Makefile} was also modified to make the entire harness self-contained, including some header files common to most of the sample
+      programs provided with the CUDA toolkit.
+    \end{paragraph}
+    \begin{paragraph}{}
+      To run the modified program, one would type the following command:
+      \begin{subparagraph}{}
+        \begin{alltt}
+          ./matrixMulCUBLAS m=\(m\) q=\(q\) n=\(n\) validation=[0|1]
+        \end{alltt}
+      \end{subparagraph}
+    \end{paragraph}
+    \begin{paragraph}{}
+      The original source validated the CUBLAS results by calculating a reference solution on the host. Given the target matrix sizes involved, this could
+      have become prohibitively expensive in terms of time cost, especially in early stage development on the author's local laptop machine.
+      This validation was made optional through the \texttt{validation} command-line argument. The default is to forgo validation, but validation of a sort
+      can be re-enabled by adding \texttt{validation=1} to the command-line call. At present, the only validation that is done is to seed the matrices $A$
+      and $B$ as homogeneous fields of ones, i.e., $A$ = \textbf{1} and $B$ = \textbf{1}. The validation simply checks that every cell of the product matrix
+      $C$ is set to $q$.
+    \end{paragraph}
+    \begin{paragraph}{}
+      The arguments \texttt{m}, \texttt{q}, and \texttt{n} can be any arbitrary integer, and no check is currently done for alignment against the CUDA card
+      except what may have existed in the original source. Since the target matrix sizes for the experiment are limited to powers of two (2), this is deemed
+      an acceptable risk.
+    \end{paragraph}
+    \begin{paragraph}{}
+      The output of the program has a fair amount of helpful human-readable information that is piped to \texttt{stderr}. Most of the \texttt{stderr} output
+      has its origins in the original source provided with the CUDA toolkit. On the other hand, output to \texttt{stdout} is reserved for machine-readable CSV text. 
+      By convention, the output consists of the following columns:
+      \begin{enumerate}
+      \item{$m$, the row dimension of $A$ and $C$}
+      \item{$q$, the column dimension of $A$ and the row dimension of $B$}
+      \item{$n$, the column dimension of $B$ and $C$}
+      \item{$r$, the achieved rate (gigaflops)}
+      \item{$s$, the number of iterations}
+      \item{$t_{iter}$, the average time spent per iteration (ms)}
+      \item{$r_{iter}$, the achieved rate per iteration (flops)}
+      \item{$t_{comm}$, the time spent in host-to-device or device-to-host transfers (ms)}
+      \end{enumerate}
+    \end{paragraph}
+  \end{subsection}
 
 \printbibliography
 
