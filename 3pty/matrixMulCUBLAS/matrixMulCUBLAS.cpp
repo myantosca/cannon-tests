@@ -295,6 +295,7 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
 	}
     }
 
+    fprintf(stdout, "m,q,n,s,r,r_iter,t_iter,t_comm\n");
     // allocate device memory
     float *d_A, *d_B, *d_C;
 
@@ -306,7 +307,9 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
     checkCudaErrors(cudaMemcpy(d_A, h_A, mem_size_A, cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMemcpy(d_B, h_B, mem_size_B, cudaMemcpyHostToDevice));
     checkCudaErrors(cudaMalloc((void **) &d_C, mem_size_C));
-
+    //if (validation) {
+    //  checkCudaErrors(cudaMemcpy(d_C, h_C, mem_size_C, cudaMemcpyHostToDevice));
+    // }
     gettimeofday(&tv_h2d_b, NULL);
     t_comm += 1000000LL * (tv_h2d_b.tv_sec - tv_h2d_a.tv_sec) + tv_h2d_b.tv_usec - tv_h2d_a.tv_usec;
     // setup execution parameters
@@ -373,8 +376,8 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
 	gettimeofday(&tv_d2h_b, NULL);
 	t_comm += 1000000LL * (tv_d2h_b.tv_sec - tv_d2h_a.tv_sec) + tv_d2h_b.tv_usec - tv_d2h_a.tv_usec;
 
-	fprintf(stdout, "%d,%d,%d,%.2f,%.0f,%.3f,%.6f\n",
-		m, q, n, gigaFlops, flopsPerMatrixMul, msecPerMatrixMul, float(t_comm) * 0.001);
+	fprintf(stdout, "%d,%d,%d,%d,%.2f,%.0f,%.3f,%.6f\n",
+		m, q, n, nIter, gigaFlops, flopsPerMatrixMul, msecPerMatrixMul, float(t_comm) * 0.001);
         // Destroy the handle
         checkCudaErrors(cublasDestroy(handle));
     }
