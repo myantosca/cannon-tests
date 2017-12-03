@@ -158,6 +158,49 @@
       \end{enumerate}
     \end{paragraph}
   \end{subsection}
+  \begin{subsection}{Scale-Out}
+    \begin{paragraph}{}
+      For the unaccelerated MPI or scale-out case, the Intel MKL libraries and their concomitant BLAS3 functions were selected as the empirical roofline model.
+      Since all of the scale-out cases will be run on nodes with Intel processors, it is assumed that the development staff at Intel has a more intimate knowledge
+      of the processors involved than the general public and therefore should be better equipped to maximize resource utilization on these architectures.
+    \end{paragraph}
+    \begin{paragraph}{}
+      There is a slight difference in the methodology involved here from that employed in the scale-up case. Whereas the scale-up case looked at resource utilization
+      holistically with regard to the accelerator, the harness for the scale-out case will evaluate the single-core performance of the MKL BLAS3 function
+      \texttt{cblas\_sgemm}\autocite{MKLcblas\_sgemm}, and the roofline will be extrapolated along a strong-scaling model so that a scale-out case running with $p$
+      processors will be measured against the single-core rate multiplied by $p$ to determine its efficiency relative to MKL.
+    \end{paragraph}
+    \begin{paragraph}{}
+      The sample code provided by Intel for \texttt{cblas\_sgemm}\autocite{MKLcblas\_sgemmx} was consulted as a reference for the scale-out single-core
+      basis harness to validate correctness of the implementation, particularly the call to \texttt{cblas\_sgemm}, but the API documentation served as the
+      primary resource that informed the implementation not only of the MKL library usage but the devising of command-line options as well. In fact, the
+      command-line options of the scale-up harness were altered to match those of the scale-out harness for legibility and ease of batch scripting later.
+    \end{paragraph}
+    \begin{paragraph}{}
+      To run the scale-out harness, one would type the following command:
+      \begin{subparagraph}{}
+        \begin{alltt}
+          ./mkl\_cblas\_sgemm -m \(m\) -q \(q\) -n \(n\) validation=[0|1]
+        \end{alltt}
+      \end{subparagraph}
+    \end{paragraph}
+    \begin{paragraph}{}
+      The arguments provided to \texttt{-m}, \texttt{-q}, and \texttt{-n} can be any arbitrary integer.
+    \end{paragraph}
+    \begin{paragraph}{}
+      Output to \texttt{stdout} is reserved for machine-readable CSV text. By convention, the output consists of the following columns:
+      \begin{enumerate}
+      \item{$m$, the row dimension of $A$ and $C$}
+      \item{$q$, the column dimension of $A$ and the row dimension of $B$}
+      \item{$n$, the column dimension of $B$ and $C$}
+      \item{$r$, the achieved rate (gigaflops)}
+      \item{$s$, the number of iterations}
+      \item{$t_{iter}$, the average time spent per iteration (ms)}
+      \item{$r_{iter}$, the achieved rate per iteration (flops)}
+      \end{enumerate}
+    \end{paragraph}
+  \end{subsection}
+\end{section}
 
 \printbibliography
 
