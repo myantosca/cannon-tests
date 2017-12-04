@@ -206,17 +206,17 @@ int main(int argc, char *argv[]) {
 			       target_device);                                       // src device
       }
     }
-    for (x = 0; x <= c; x++) {
-      for (y = 0; y < b; y++) {
-	// Shift B(y,x) up 1 block.
+    for (x = 0; x <= b+1; x++) {
+      for (y = 0; y < c; y++) {
+	// Shift B(x,y) up 1 block.
 	omp_target_memcpy_rect(dB, dB,                                               // dst, src
 			       sizeof(float),                                        // elems
 			       2,                                                    // dims
 			       (const size_t[2]){ v, w },                            // volume
-			       (const size_t[2]){ (x % (c+1)) * v, y * w },          // dst offs
-			       (const size_t[2]){ ((x + 1) % (c+1)) * v, y * w },    // src offs
-			       (const size_t[2]){ (c + 1) * v, b * w },              // dst dims
-			       (const size_t[2]){ (c + 1) * v, b * w },              // src dims
+			       (const size_t[2]){ (x % (b+1)) * v, y * w },          // dst offs
+			       (const size_t[2]){ ((x + 1) % (b+1)) * v, y * w },    // src offs
+			       (const size_t[2]){ (b + 1) * v, c * w },              // dst dims
+			       (const size_t[2]){ (b + 1) * v, c * w },              // src dims
 			       target_device,                                        // dst device
 			       target_device);                                       // src device
       }
