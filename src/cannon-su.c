@@ -130,7 +130,7 @@ int main(int argc, char *argv[]) {
 			     sizeof(float),                                        // elem size
 			     2,                                                    // dims
 			     (const size_t[2]){ u, v },                            // volume
-			     (const size_t[2]){ x * u, (((y + x) % c) + 1) * v },  // dst offs
+			     (const size_t[2]){ x * u, (abs((y - x) % c) + 1) * v },  // dst offs
 			     (const size_t[2]){ x * u, y * v },                    // src offs
 			     (const size_t[2]){ b * u, (c + 1) * v},               // dst dims
 			     (const size_t[2]){ b * u, c * v },                    // src dims
@@ -143,10 +143,10 @@ int main(int argc, char *argv[]) {
 			     sizeof(float),                                        // elems
 			     2,                                                    // dims
 			     (const size_t[2]){ v, w },                            // volume
-			     (const size_t[2]){ (((y+x) % c) + 1) * v, x * w },    // dst offs
-			     (const size_t[2]){ y * v, x * w },                    // src offs
-			     (const size_t[2]){ (c + 1) * v, b * w },              // dst dims
-			     (const size_t[2]){ c * v, b * w },                    // src dims
+			     (const size_t[2]){ (abs((x - y) % b) + 1) * v, y * w },  // dst offs
+			     (const size_t[2]){ x * v, y * w },                    // src offs
+			     (const size_t[2]){ (b + 1) * v, c * w },              // dst dims
+			     (const size_t[2]){ b * v, c * w },                    // src dims
 			     target_device,                                        // dst device
 			     host_device);                                         // src device
     }
