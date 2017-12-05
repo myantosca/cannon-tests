@@ -2,19 +2,21 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <sys/time.h>
 
 #include <omp.h>
 
 int main(int argc, char *argv[]) {
-  int a = 1, m = 256, q = 256, n = 256, s = 30;
+  int a = 1, m = 256, q = 256, n = 256, s = 1;
   float *A = NULL, *B = NULL, *C = NULL;
-
+  struct timeval tv_comm_a, tv_comm_b, tv_mult_a, tv_mult_b;
+  long long t_comm = 0, t_mult = 0;
   int num_devices;
   int host_device = omp_get_initial_device();
   int target_device = host_device;
   num_devices = omp_get_num_devices();
-  if (num_devices > 1) {
-    target_device = 1;
+  if (num_devices > 0) {
+    target_device = 0;
   }
 
   while (a < argc) {
@@ -57,8 +59,8 @@ int main(int argc, char *argv[]) {
   size_t w = n / b;
   size_t x,y;
 
-  // Debug printout to check dimension values.
-  printf("p = %lu, b = %lu, c = %lu, u = %lu, v = %lu, w = %lu\n", p, b, c, u, v, w);
+  /* // Debug printout to check dimension values. */
+  /* printf("p = %lu, b = %lu, c = %lu, u = %lu, v = %lu, w = %lu\n", p, b, c, u, v, w); */
 
 
   int i, j, k, l;
@@ -100,6 +102,7 @@ int main(int argc, char *argv[]) {
   // If there is no target device, copy and skew to a location in host memory.
   float *dA, *dB, *dC;
 
+  gettimeofday(&tv_comm_a, NULL);
   // Allocate A with ghost column.
   dA = (float *)omp_target_alloc(m * (q+v) * sizeof(float), target_device);
   // Allocate B with ghost row.
@@ -108,23 +111,23 @@ int main(int argc, char *argv[]) {
   dC = (float *)omp_target_alloc(m * n * sizeof(float), target_device);
   // Copy C to target
   omp_target_memcpy(dC, C, m * n * sizeof(float), 0, 0, target_device, host_device);
-/* #pragma omp parallel for \ */
-/*   default(none) num_threads(b)	   \ */
-/*   shared(dA) shared(dB) shared(dC) \ */
-/*   shared(A) shared(B) shared(C) \ */
-/*   shared(host_device) shared(target_device) \ */
-/*   shared(b) shared(c) shared(q) shared(u) shared(v) shared(w) \ */
-/*   private(x) */
+#pragma omp parallel for \
+  default(none) num_threads(b)	   \
+  shared(dA) shared(dB) shared(dC) \
+  shared(A) shared(B) shared(C) \
+  shared(host_device) shared(target_device) \
+  shared(b) shared(c) shared(q) shared(u) shared(v) shared(w) \
+  private(x)
   for (x = 0; x < b; x++) {
-/* #pragma omp parallel for \ */
-/*   default(none) num_threads(b)	   \ */
-/*   shared(dA) shared(dB) shared(dC) \ */
-/*   shared(A) shared(B) shared(C)	   \ */
-/*   shared(host_device) shared(target_device) \ */
-/*   shared(b) shared(c) shared(q) shared(u) shared(v) shared(w) \ */
-/*   shared(x) private(y) */
+#pragma omp parallel for \
+  default(none) num_threads(b)	   \
+  shared(dA) shared(dB) shared(dC) \
+  shared(A) shared(B) shared(C)	   \
+  shared(host_device) shared(target_device) \
+  shared(b) shared(c) shared(q) shared(u) shared(v) shared(w) \
+  shared(x) private(y)
     for (y = 0; y < c; y++) {
-      // Shear block A(x,y) to dA(x,(y+x)%c).
+      // Shear block A(x,y) to dA(x,(y-x)%c).
       // A remains in block row major, handled by P(x,y).
       omp_target_memcpy_rect(dA, A,                                                // dst, src
 			     sizeof(float),                                        // elem size
@@ -137,8 +140,8 @@ int main(int argc, char *argv[]) {
 			     target_device,                                        // dst device
 			     host_device);                                         // src device
 
-      // Shear block B(y,x) to dB((y+x)%c,x).
-      // B remains in block row major, handled by P(y,x).
+      // Shear block B(y,x) to dB((x-y)%b,x).
+      // B remains in block row major, handled by P(x,y).
       omp_target_memcpy_rect(dB, B,                                                // dst, src
 			     sizeof(float),                                        // elems
 			     2,                                                    // dims
@@ -151,45 +154,48 @@ int main(int argc, char *argv[]) {
 			     host_device);                                         // src device
     }
   }
+  gettimeofday(&tv_comm_b, NULL);
 
-  // Debugging printout to validate shearing of A and B.
-  for (i = 0; i < m; i++) {
-    printf("A = ");
-    for (j = 0; j < q; j++) {
-      printf("%f ", A[i * q + j]);
-    }
-    printf("\n");
-  }
-  for (i = 0; i < q; i++) {
-    printf("B = ");
-    for (j = 0; j < n; j++) {
-      printf("%f ", B[i * n + j]);
-    }
-    printf("\n");
-  }
-  printf("===========================================\n");
-  for (i = 0; i < m; i++) {
-    printf("dA = ");
-    for (j = 0; j < q + v; j++) {
-      if (j == v) printf("| ");
-      printf("%f ", dA[i * (q + v) + j]);
-    }
-    printf("\n");
-  }
+  t_comm += 1000000LL * (tv_comm_b.tv_sec - tv_comm_a.tv_sec) + tv_comm_b.tv_usec - tv_comm_a.tv_usec;
+  /* // Debugging printout to validate shearing of A and B. */
+  /* for (i = 0; i < m; i++) { */
+  /*   printf("A = "); */
+  /*   for (j = 0; j < q; j++) { */
+  /*     printf("%f ", A[i * q + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
+  /* for (i = 0; i < q; i++) { */
+  /*   printf("B = "); */
+  /*   for (j = 0; j < n; j++) { */
+  /*     printf("%f ", B[i * n + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
+  /* printf("===========================================\n"); */
+  /* for (i = 0; i < m; i++) { */
+  /*   printf("dA = "); */
+  /*   for (j = 0; j < q + v; j++) { */
+  /*     if (j == v) printf("| "); */
+  /*     printf("%f ", dA[i * (q + v) + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
 
-  for (i = 0; i < q + v; i++) {
-    if (i == v) printf("-----------------------------------\n");
-    printf("dB = ");
-    for (j = 0; j < n; j++) {
-      printf("%f ", dB[i * n + j]);
-    }
-    printf("\n");
-  }
+  /* for (i = 0; i < q + v; i++) { */
+  /*   if (i == v) printf("-----------------------------------\n"); */
+  /*   printf("dB = "); */
+  /*   for (j = 0; j < n; j++) { */
+  /*     printf("%f ", dB[i * n + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
 
   // Phase 2: Cycle through the blocks and multiply the blocks, shifting A left and B up by one block each iteration.
   size_t d;
   for (d = 0; d < sqrt(b*c); d++) {
-    printf("===========================================\n");
+    /* printf("===========================================\n"); */
+    gettimeofday(&tv_comm_a, NULL);
     // Cycle A and B.
     for (x = 0; x < b; x++) {
       for (y = 0; y <= c; y++) {
@@ -221,53 +227,66 @@ int main(int argc, char *argv[]) {
 			       target_device);                                       // src device
       }
     }
+    gettimeofday(&tv_comm_b, NULL);
+
+    t_comm += 1000000LL * (tv_comm_b.tv_sec - tv_comm_a.tv_sec) + tv_comm_b.tv_usec - tv_comm_a.tv_usec;
+
+    gettimeofday(&tv_mult_a, NULL);
+
+    #pragma omp target parallel for device(target_device) num_threads(b) private(x) is_device_ptr(dC,dA,dB)
     // Multiply all the blocks for the present iteration.
     for (x = 0; x < b; x++) {
+      #pragma omp parallel for num_threads(c) private(y) private(i) private(k) private(j) firstprivate(x)
       for (y = 0; y < c; y++) {
 	// Block multiply A(x,y) by B(x,y).
 	for (i = 0; i < u; i++) {
 	  for (k = 0; k < v; k++) {
 	    for (j = 0; j < w; j++) {
-	      printf("[%lu] %f + ", x * u * n + i * n + y * w + j, dC[x * u * n + i * n + y * w + j]);
+	      //printf("[%lu] %f + ", x * u * n + i * n + y * w + j, dC[x * u * n + i * n + y * w + j]);
 	      dC[x * u * n + i * n + y * w + j] += dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k] * dB[(x+1) * v * n + k * n + y * w + j];
-	      printf("%f * %f = %f\n", dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k], dB[(x+1) * v * n + k * n + y * w + j], dC[x * u * n + i * n + y * w + j]);
+	      //printf("%f * %f = %f\n", dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k], dB[(x+1) * v * n + k * n + y * w + j], dC[x * u * n + i * n + y * w + j]);
 	    }
 	  }
 	}
       }
     }
-    for (i = 0; i < m; i++) {
-      printf("dA(%lu) = ", d);
-      for (j = 0; j < q + v; j++) {
-	if (j == v) printf("| ");
-    	printf(" %f ", dA[i * (q + v) + j]);
-      }
-      printf("\n");
-    }
+    gettimeofday(&tv_mult_b, NULL);
 
-    for (i = 0; i < q + v; i++) {
-      if (i == v) printf("-----------------------------------\n");
-      printf("dB(%lu) = ", d);
-      for (j = 0; j < n; j++) {
-    	printf("%f ", dB[i * n + j]);
-      }
-      printf("\n");
-    }
+    t_mult += 1000000LL * (tv_mult_b.tv_sec - tv_mult_a.tv_sec) + tv_mult_b.tv_usec - tv_mult_a.tv_usec;
+
+    /* for (i = 0; i < m; i++) { */
+    /*   printf("dA(%lu) = ", d); */
+    /*   for (j = 0; j < q + v; j++) { */
+    /* 	if (j == v) printf("| "); */
+    /* 	printf(" %f ", dA[i * (q + v) + j]); */
+    /*   } */
+    /*   printf("\n"); */
+    /* } */
+
+    /* for (i = 0; i < q + v; i++) { */
+    /*   if (i == v) printf("-----------------------------------\n"); */
+    /*   printf("dB(%lu) = ", d); */
+    /*   for (j = 0; j < n; j++) { */
+    /* 	printf("%f ", dB[i * n + j]); */
+    /*   } */
+    /*   printf("\n"); */
+    /* } */
   }
 
   // Copy results from device back to host.
   omp_target_memcpy(C, dC, m * n * sizeof(float), 0, 0, host_device, target_device);
 
-  for (i = 0; i < m; i++) {
-    printf("C = ");
-    for (j = 0; j < n; j++) {
-      printf("%f ", C[i * n + j]);
-    }
-    printf("\n");
-  }
+  /* for (i = 0; i < m; i++) { */
+  /*   printf("C = "); */
+  /*   for (j = 0; j < n; j++) { */
+  /*     printf("%f ", C[i * n + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
 
   // Report timing results.
-  // TODO
+  double flops = 2.0 * m * n * q;
+  fprintf(stdout, "%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", m, q, n, s, flops, flops * 1e-9 / (t_mult * 1e-6), t_mult * 0.001, t_comm * 0.001);
 
   if (A) free(A);
   if (B) free(B);
