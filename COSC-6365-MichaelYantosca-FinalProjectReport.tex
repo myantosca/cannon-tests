@@ -202,6 +202,23 @@
   \end{subsection}
 \end{section}
 
+\begin{section}{Implementation}
+  \begin{subsection}{Scale-Up}
+    \begin{paragraph}{}
+      Initial development on the scale-up implementation of Cannon's algorithm began with OpenMP. Some difficulties were encountered with regard
+      to the offset math required for setting up a non-square 2D grid which delayed development of the parallelization. Once the problem was
+      reduced to the square target matrix sizes, it was realized that part of the problem was the failure to enforce the rigidity of the grid dimensions
+      and coupled with a misreading of the algorithm description with regard to the initial shearing of phase 1.
+    \end{paragraph}
+    \begin{paragraph}{}
+      An additional hurdle was encountered when it became clear that OpenMP GPU offloading was not enabled with either gcc or icc on the intended
+      BRIDGES computing cluster. Reading the GPU user guide for BRIDGES\autocite{BridgesGPUGuide} made it clear that the preferred and supported means of \texttt{\#pragma}-centric
+      acceleration was OpenACC with the PGI compiler. A quick perusal of the GCC documentation for OpenACC support\autocite{gccOpenACC} revealed a series
+      of known issues that made GCC infeasible for use, even with the latest 7.2 release. Namely, the lack of support for host fallback and nested
+      parallel loop support eliminated GCC from consideration.
+    \end{paragraph}
+  \end{subsection}
+\end{section}
 \printbibliography
 
 \end{document}
