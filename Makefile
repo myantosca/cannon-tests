@@ -1,7 +1,7 @@
 PROPOSAL_FNAME_BASE=COSC-6365-MichaelYantosca-FinalProjectProposal
 REPORT_FNAME_BASE=COSC-6365-MichaelYantosca-FinalProjectReport
 
-all: docs
+all: docs matrixMulCUBLAS mkl_cblas_sgemm cannon
 
 docs: $(PROPOSAL_FNAME_BASE).pdf $(REPORT_FNAME_BASE).pdf
 
@@ -9,6 +9,18 @@ docs: $(PROPOSAL_FNAME_BASE).pdf $(REPORT_FNAME_BASE).pdf
 	@lualatex -shell-escape $*.tex
 	@biber $*
 	@lualatex -shell-escape $*.tex
+
+matrixMulCUBLAS:
+	@make -C 3pty/matrixMulCUBLAS
+	@cp 3pty/matrixMulCUBLAS/matrixMulCUBLAS .
+
+mkl_cblas_sgemm:
+	@make -C 3pty/mkl_cblas_sgemm
+	@cp 3pty/mkl_cblas_sgemm/mkl_cblas_sgemm .
+
+cannon:
+	@make -C src
+	@cp src/cannon-su-acc .
 
 superclean: clean superclean-doc-$(PROPOSAL_FNAME_BASE) superclean-doc-$(REPORT_FNAME_BASE)
 
