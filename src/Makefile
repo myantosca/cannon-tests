@@ -2,7 +2,7 @@ CC=gcc-7
 MPICC=mpicc
 ACC_INCS=-I/opt/pgi/linux-86-64/2017/include
 
-all: cannon-su-acc cannon-so
+all: cannon-su-acc
 
 cannon-su-omp: cannon-su.c
 	@$(CC) -g -DOMP -fno-stack-protector -foffload=nvptx-none -fopenmp $^ -o $@ -lm -lgomp
