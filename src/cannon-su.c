@@ -86,7 +86,7 @@ int main(int argc, char *argv[]) {
   size_t x,y;
 
   /* // Debug printout to check dimension values. */
-  printf("p = %lu, b = %lu, c = %lu, u = %lu, v = %lu, w = %lu\n", p, b, c, u, v, w);
+  /* printf("p = %lu, b = %lu, c = %lu, u = %lu, v = %lu, w = %lu\n", p, b, c, u, v, w); */
 
 
   int i, j, k, l;
@@ -224,39 +224,39 @@ int main(int argc, char *argv[]) {
   gettimeofday(&tv_comm_b, NULL);
 
   t_comm += 1000000LL * (tv_comm_b.tv_sec - tv_comm_a.tv_sec) + tv_comm_b.tv_usec - tv_comm_a.tv_usec;
-  // Debugging printout to validate shearing of A and B.
-  for (i = 0; i < m; i++) {
-    printf("A = ");
-    for (j = 0; j < q; j++) {
-      printf("%f ", A[i * q + j]);
-    }
-    printf("\n");
-  }
-  for (i = 0; i < q; i++) {
-    printf("B = ");
-    for (j = 0; j < n; j++) {
-      printf("%f ", B[i * n + j]);
-    }
-    printf("\n");
-  }
-  printf("===========================================\n");
-  for (i = 0; i < m; i++) {
-    printf("dA = ");
-    for (j = 0; j < q + v; j++) {
-      if (j == v) printf("| ");
-      printf("%f ", dA[i * (q + v) + j]);
-    }
-    printf("\n");
-  }
+  /* // Debugging printout to validate shearing of A and B. */
+  /* for (i = 0; i < m; i++) { */
+  /*   printf("A = "); */
+  /*   for (j = 0; j < q; j++) { */
+  /*     printf("%f ", A[i * q + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
+  /* for (i = 0; i < q; i++) { */
+  /*   printf("B = "); */
+  /*   for (j = 0; j < n; j++) { */
+  /*     printf("%f ", B[i * n + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
+  /* printf("===========================================\n"); */
+  /* for (i = 0; i < m; i++) { */
+  /*   printf("dA = "); */
+  /*   for (j = 0; j < q + v; j++) { */
+  /*     if (j == v) printf("| "); */
+  /*     printf("%f ", dA[i * (q + v) + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
 
-  for (i = 0; i < q + v; i++) {
-    if (i == v) printf("-----------------------------------\n");
-    printf("dB = ");
-    for (j = 0; j < n; j++) {
-      printf("%f ", dB[i * n + j]);
-    }
-    printf("\n");
-  }
+  /* for (i = 0; i < q + v; i++) { */
+  /*   if (i == v) printf("-----------------------------------\n"); */
+  /*   printf("dB = "); */
+  /*   for (j = 0; j < n; j++) { */
+  /*     printf("%f ", dB[i * n + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
 
   // Phase 2: Cycle through the blocks and multiply the blocks, shifting A left and B up by one block each iteration.
   size_t d;
@@ -264,8 +264,9 @@ int main(int argc, char *argv[]) {
     /* printf("===========================================\n"); */
     gettimeofday(&tv_comm_a, NULL);
     // Cycle A and B.
-    for (x = 0; x < b; x++) {
-      for (y = 0; y <= c; y++) {
+    for (y = 0; y <= c; y++) {
+      #pragma acc kernels num_gangs(b) num_workers(u)
+      for (x = 0; x < b; x++) {
 	// Shift A(x,y) left 1 block.
 #ifdef OMP
 	omp_target_memcpy_rect(dA, dA,                                               // dst, src
@@ -350,23 +351,23 @@ int main(int argc, char *argv[]) {
 
     t_mult += 1000000LL * (tv_mult_b.tv_sec - tv_mult_a.tv_sec) + tv_mult_b.tv_usec - tv_mult_a.tv_usec;
 
-    for (i = 0; i < m; i++) {
-      printf("dA(%lu) = ", d);
-      for (j = 0; j < q + v; j++) {
-    	if (j == v) printf("| ");
-    	printf(" %f ", dA[i * (q + v) + j]);
-      }
-      printf("\n");
-    }
+    /* for (i = 0; i < m; i++) { */
+    /*   printf("dA(%lu) = ", d); */
+    /*   for (j = 0; j < q + v; j++) { */
+    /* 	if (j == v) printf("| "); */
+    /* 	printf(" %f ", dA[i * (q + v) + j]); */
+    /*   } */
+    /*   printf("\n"); */
+    /* } */
 
-    for (i = 0; i < q + v; i++) {
-      if (i == v) printf("-----------------------------------\n");
-      printf("dB(%lu) = ", d);
-      for (j = 0; j < n; j++) {
-    	printf("%f ", dB[i * n + j]);
-      }
-      printf("\n");
-    }
+    /* for (i = 0; i < q + v; i++) { */
+    /*   if (i == v) printf("-----------------------------------\n"); */
+    /*   printf("dB(%lu) = ", d); */
+    /*   for (j = 0; j < n; j++) { */
+    /* 	printf("%f ", dB[i * n + j]); */
+    /*   } */
+    /*   printf("\n"); */
+    /* } */
   }
 
   // Copy results from device back to host.
@@ -377,18 +378,18 @@ int main(int argc, char *argv[]) {
   acc_memcpy_from_device(C, dC, m * n * sizeof(float));
 #endif
 
-  for (i = 0; i < m; i++) {
-    printf("C = ");
-    for (j = 0; j < n; j++) {
-      printf("%f ", C[i * n + j]);
-    }
-    printf("\n");
-  }
+  /* for (i = 0; i < m; i++) { */
+  /*   printf("C = "); */
+  /*   for (j = 0; j < n; j++) { */
+  /*     printf("%f ", C[i * n + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
 
   // Report timing results.
   double flops = 2.0 * m * n * q;
   fprintf(stdout, "%lu,%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", p, m, q, n, s, flops, flops * 1e-9 / (t_mult * 1e-6), t_mult * 0.001, t_comm * 0.001);
-
+  }
   if (A) free(A);
   if (B) free(B);
   if (C) free(C);
