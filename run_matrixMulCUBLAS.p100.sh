@@ -10,5 +10,5 @@ export DOUT="./results/matrixMulCUBLAS/p100/${TS}"
 
 mkdir -p ${DOUT}
 for ((d = 256; d < 65536; d *= 4)); do
-    ./matrixMulCUBLAS m=$d q=$d n=$d 1> ./matrixMulCUBLAS.p100.$d.csv 2> /dev/null
+    ./matrixMulCUBLAS m=$d q=$d n=$d 1> ${DOUT}/matrixMulCUBLAS.p100.$d.csv 2> /dev/null
 done
