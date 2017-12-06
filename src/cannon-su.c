@@ -125,13 +125,10 @@ int main(int argc, char *argv[]) {
   /*   } */
   /* } */
 
-  int e;
-  for (e = 0; e < s; e++) {
   // Phase 1: Offload the matrices to the target device and skew the matrices A and B.
   // If there is no target device, copy and skew to a location in host memory.
   float *dA, *dB, *dC;
 
-  gettimeofday(&tv_comm_a, NULL);
 #ifdef OMP
   // Allocate A with ghost column.
   dA = (float *)omp_target_alloc(m * (q+v) * sizeof(float), target_device);
@@ -139,8 +136,6 @@ int main(int argc, char *argv[]) {
   dB = (float *)omp_target_alloc((q+v) * n * sizeof(float), target_device);
   // Allocate C as-is.
   dC = (float *)omp_target_alloc(m * n * sizeof(float), target_device);
-  // Copy C to target
-  omp_target_memcpy(dC, C, m * n * sizeof(float), 0, 0, target_device, host_device);
 #endif
 
 #ifdef ACC
@@ -150,6 +145,19 @@ int main(int argc, char *argv[]) {
   dB = acc_malloc((q+v) * n * sizeof(float));
   // Allocate C as-is.
   dC = acc_malloc(m * n * sizeof(float));
+#endif
+
+  int e;
+  for (e = 0; e < s; e++) {
+
+  gettimeofday(&tv_comm_a, NULL);
+
+#ifdef OMP
+  // Copy C to target
+  omp_target_memcpy(dC, C, m * n * sizeof(float), 0, 0, target_device, host_device);
+#endif
+
+#ifdef ACC
   // Copy C to target
   acc_memcpy_to_device(dC, C, m * n * sizeof(float));
 #endif
@@ -381,14 +389,22 @@ int main(int argc, char *argv[]) {
   // Report timing results.
   double flops = 2.0 * m * n * q;
   fprintf(stdout, "%lu,%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", p, m, q, n, s, flops, flops * 1e-9 / (t_mult * 1e-6), t_mult * 0.001, t_comm * 0.001);
+
   }
-  if (A) free(A);
-  if (B) free(B);
-  if (C) free(C);
 #ifdef OMP
   if (dA) omp_target_free(dA, target_device);
   if (dB) omp_target_free(dB, target_device);
   if (dC) omp_target_free(dC, target_device);
 #endif
+
+#ifdef ACC
+  if (dA) acc_free(dA);
+  if (dB) acc_free(dB);
+  if (dC) acc_free(dC);
+#endif 
+
+  if (A) free(A);
+  if (B) free(B);
+  if (C) free(C);
   return 0;
 }
