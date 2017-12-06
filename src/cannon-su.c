@@ -124,6 +124,8 @@ int main(int argc, char *argv[]) {
   /*   } */
   /* } */
 
+  int e;
+  for (e = 0; e < s; e++) {
   // Phase 1: Offload the matrices to the target device and skew the matrices A and B.
   // If there is no target device, copy and skew to a location in host memory.
   float *dA, *dB, *dC;
@@ -284,31 +286,28 @@ int main(int argc, char *argv[]) {
 #endif
       }
     }
-    for (x = 0; x <= b+1; x++) {
-      for (y = 0; y < c; y++) {
+
+
+    for (x = 0; x <= b + 1; x++) {
 #ifdef OMP
-	// Shift B(x,y) up 1 block.
-	omp_target_memcpy_rect(dB, dB,                                               // dst, src
-			       sizeof(float),                                        // elems
-			       2,                                                    // dims
-			       (const size_t[2]){ v, w },                            // volume
-			       (const size_t[2]){ (x % (b+1)) * v, y * w },          // dst offs
-			       (const size_t[2]){ ((x + 1) % (b+1)) * v, y * w },    // src offs
-			       (const size_t[2]){ (b + 1) * v, c * w },              // dst dims
-			       (const size_t[2]){ (b + 1) * v, c * w },              // src dims
-			       target_device,                                        // dst device
-			       target_device);                                       // src device
+    // Shift B(x) up 1 block.
+    omp_target_memcpy_rect(dB, dB,                                               // dst, src
+                           sizeof(float),                                        // elems
+                           2,                                                    // dims
+                           (const size_t[2]){ v, c * w },                        // volume
+			   (const size_t[2]){ (x % (b+1)) * v, y * w },          // dst offs
+			   (const size_t[2]){ ((x + 1) % (b+1)) * v, y * w },    // src offs
+			   (const size_t[2]){ (b + 1) * v, c * w },              // dst dims
+			   (const size_t[2]){ (b + 1) * v, c * w },              // src dims
+			   target_device,                                        // dst device
+			   target_device);                                       // src device
 #endif
 
 #ifdef ACC
-	for (k = 0; k < v; k++) {
-	  size_t dst_off = (x % (b+1)) * v * n + k * n + y * w;
-	  size_t src_off = ((x+1) % (b+1)) * v * n + k * n + y * w;
-	  acc_memcpy_device(dB + dst_off, dB + src_off, w * sizeof(float));
-	}
+      acc_memcpy_device(dB + (x%(b+1)) * v * n, dB + ((x+1)%(b+1)) * v * n, v * n * sizeof(float));
 #endif
-      }
     }
+
     gettimeofday(&tv_comm_b, NULL);
 
     t_comm += 1000000LL * (tv_comm_b.tv_sec - tv_comm_a.tv_sec) + tv_comm_b.tv_usec - tv_comm_a.tv_usec;
