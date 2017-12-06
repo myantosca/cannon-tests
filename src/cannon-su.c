@@ -203,7 +203,7 @@ int main(int argc, char *argv[]) {
       // TODO: Do phase 1 shear with OpenACC.
       for (k = 0; k < u; k++) {
 	size_t dst_off = x * u * (q+v) + k * (q+v) + (abs((y - x) % c) + 1) * v;
-	size_t src_off = x * u * (q+v) + k * (q+v) + y * v;
+	size_t src_off = x * u * q + k * q + y * v;
 	acc_memcpy_to_device(dA + dst_off, A + src_off, v * sizeof(float));
       }
 
