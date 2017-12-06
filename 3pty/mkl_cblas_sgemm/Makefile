@@ -6,3 +6,6 @@ all: mkl_cblas_sgemm
 mkl_cblas_sgemm: mkl_cblas_sgemm.c
 
 	gcc -g -I$(MKLROOT)/include $^ -o mkl_cblas_sgemm $(MKLLIBS)
+
+clean:
+	@rm -f mkl_cblas_sgemm

@@ -12,3 +12,8 @@ cannon-su-acc: cannon-su.c
 
 cannon-so: cannon-so.c
 	@$(MPICC) -g $^ -o $@ -lm -lmpi
+
+clean:
+	@rm -f cannon-su-acc
+	@rm -f cannon-su-omp
+	@rm -f cannon-so
