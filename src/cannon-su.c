@@ -125,14 +125,8 @@ int main(int argc, char *argv[]) {
   /* } */
 
   // Phase 1: Offload the matrices to the target device and skew the matrices A and B.
-//#ifdef OMP
   // If there is no target device, copy and skew to a location in host memory.
   float *dA, *dB, *dC;
-//#endif
-
-/* #ifdef ACC */
-/*   d_void *dA, *dB, *dC; */
-/* #endif */
 
   gettimeofday(&tv_comm_a, NULL);
 #ifdef OMP
@@ -282,7 +276,6 @@ int main(int argc, char *argv[]) {
 #endif
 
 #ifdef ACC
-	// TODO: Phase 2 cyclic rotation of A.
 	for (k = 0; k < u; k++) {
 	  size_t dst_off = x * u * (q+v) + k * (q+v) + (y % (c+1)) * v;
 	  size_t src_off = x * u * (q+v) + k * (q+v) + ((y + 1) % (c+1)) * v;
@@ -308,7 +301,6 @@ int main(int argc, char *argv[]) {
 #endif
 
 #ifdef ACC
-	// TODO: Phase 2 cyclic rotation of B.
 	for (k = 0; k < v; k++) {
 	  size_t dst_off = (x % (b+1)) * v * n + k * n + y * w;
 	  size_t src_off = ((x+1) % (b+1)) * v * n + k * n + y * w;
