@@ -76,13 +76,14 @@ int main(int argc, char *argv[]) {
   memset(C, 0, m * n * sizeof(float));
 
   // Determine blocking based on number of OpenMP threads.
-  // A is set up on a b x c 2D grid, B is set up on a c x b 2D grid.
+  // A and B are set up on b x c 2D grids.
   size_t b = floor(sqrt(m * p / n));
   size_t c = floor(sqrt(n * p / m));
-  // Internal block dims. Each block of A is u x v cells. Each block of B is v x u cells.
+  // Internal block dims. Each block of A is u x v cells. Each block of B is v x w cells.
+  // NB: This will only work for square matrices.
   size_t u = m / b;
   size_t v = q / c;
-  size_t w = n / b;
+  size_t w = n / c;
   size_t x,y;
 
   /* // Debug printout to check dimension values. */
