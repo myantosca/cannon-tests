@@ -3,7 +3,7 @@
 #SBATCH -t 30:00
 #SBATCH -N 1
 #SBATCH --ntasks-per-node 1
-#SBATCH --gres=gpu:k80:1
+#SBATCH --gres=gpu:k80:4
 
 export TS="$(date +%yy-%m-%d.%H.%M.%S)"
 export DOUT="./results/matrixMulCUBLAS/k80/${TS}"

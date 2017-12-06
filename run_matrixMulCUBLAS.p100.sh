@@ -3,7 +3,7 @@
 #SBATCH -t 30:00
 #SBATCH -N 1
 #SBATCH --ntasks-per-node 1
-#SBATCH --gres=gpu:p100:1
+#SBATCH --gres=gpu:p100:2
 
 export TS="$(date +%yy-%m-%d.%H.%M.%S)"
 export DOUT="./results/matrixMulCUBLAS/p100/${TS}"
