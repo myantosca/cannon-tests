@@ -217,6 +217,47 @@
       of known issues that made GCC infeasible for use, even with the latest 7.2 release. Namely, the lack of support for host fallback and nested
       parallel loop support eliminated GCC from consideration.
     \end{paragraph}
+    \begin{paragraph}
+      As it stands right now, the OpenACC implementation is functional, but not at all performant. There are some additional modifications to be made
+      to take advantage of acceleration, primarily in the block multiplication phase. Presently, the pgcc compiler is only adding serial accelerated
+      loops because of loop variable dependencies.
+    \end{paragraph}
+  \end{subsection}
+  \begin{subsection}{Scale-Out}
+    \begin{paragraph}{}
+      Development of the scale-out implementation borrowed the core of the OpenACC implementation from the scale-up implementation and was ported
+      to use the MPI library functions. This port employed the RMA communication mechanism with Post-Start-Complete-Wait synchronization since
+      the cyclic rotation between MPI processes must be marshalled in such a way that the present data is not overwritten.
+    \end{paragraph}
+    \begin{paragraph}{Array Distribution}
+      During program startup, the root process $P_{0,0}$ fills the arrays $A$, $B$, and $C$ and issues a \texttt{MPI\_Win\_post} call to \texttt{MPI\_COMM\_WORLD}
+      to notify the other processes and itself that the arrays are ready for retrieval. Each process $P_{x,y}$ issues a \texttt{MPI\_Get} request
+      to the root process $P_{0,0}$ for the properly sheared 2D subarrays $A_{x,(y+x)\ mod\ c}$ and $B_{(x+y)\ mod\ b, y}$ along with the stationary
+      2D subarray $C_{x,y}$. These are stored in individual process memory and opened via another RMA window so that the requisite neighbor processes
+      can access them during the cyclic rotation phases.
+    \end{paragraph}
+    \begin{paragraph}{Cyclic Rotation}
+      Within each process, the memory allocated for the $A$ and $B$ subarrays is actually twice that required. This is to enable whole-block copying
+      between neighbor processes. The additional space serves as a send buffer during cyclic rotation and prevents corruption. Each process $P_{x,y}$
+      copies the entirety of the $A$ ($B$) submatrix and then issues a \texttt{MPI\_Win\_post} call for the corresponding window to a group comprised of
+      only its east (south) neighbor so that it can receive the other's copy of the corresponding submatrix. Immediately after the \texttt{MPI\_Post}
+      calls are sent, the process $P_{x,y}$ then issues a \texttt{MPI\_Win\_Start} call to its west (north) neighbor so that it can send its prior submatrix
+      $A$ ($B$) from the ghost block. Once that neighbor has posted its readiness, the process $P_{x,y}$ issues a \texttt{MPI\_Put} to deliver the data.
+      The transaction is finalized with a call to \texttt{MPI\_Win\_complete} on the corresponding window, and then the process issues a \texttt{MPI\_Win\_wait}
+      to block until it has assurance that its supplier has finished the incoming transaction before proceeding to the multiplication phase.
+    \end{paragraph}
+    \begin{paragraph}{Local Multiplication}
+      The local multiplication is implemented as a simple \emph{ikj} block multiplication. Some attempts have been made to optimize it
+      with OpenMP, but the parallelizations have turned out to be worse than the serial in local development tests.
+      After each local multiplication is finished, the process $P\_{x,y}$ loops until it has processed the block row $x$ and block column $y$
+      at most once.
+    \end{paragraph}
+    \begin{paragraph}{Collection}
+      When all the work has finished, the various processes report back to the root process via individual \texttt{MPI\_Put} calls to load balance
+      the communication. It remains to be seen whether a more complex call like \texttt{MPI\_Gather} can be used to optimize the implementation.
+    \end{paragraph}
+    \begin{paragraph}
+    \end{paragraph}
   \end{subsection}
 \end{section}
 \printbibliography
