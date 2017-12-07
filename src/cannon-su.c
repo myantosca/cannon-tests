@@ -393,7 +393,7 @@ int main(int argc, char *argv[]) {
 
   // Report timing results.
   double flops = 2.0 * m * n * q;
-  fprintf(stdout, "%lu,%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", p, m, q, n, s, flops, flops * 1e-9 / (t_mult * 1e-6), t_mult * 0.001, t_comm * 0.001);
+  fprintf(stdout, "%lu,%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", p, m, q, n, s, flops, flops * 1e-9 / (t_mult * 1e6), t_mult * 0.001, t_comm * 0.001);
 
   }
 #ifdef OMP
