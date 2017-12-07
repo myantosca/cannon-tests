@@ -16,14 +16,18 @@
 int main(int argc, char *argv[]) {
   int a = 1, m = 256, q = 256, n = 256, s = 1;
   float *A = NULL, *B = NULL, *C = NULL;
-  struct timeval tv_comm_a, tv_comm_b, tv_mult_a, tv_mult_b;
-  long long t_comm = 0, t_mult = 0;
+  //struct timeval tv_comm_a, tv_comm_b, tv_mult_a, tv_mult_b;
+  double t_comm = 0.0, t_mult = 0.0, t_comm_a, t_comm_b, t_comm_a_min, t_comm_b_max, t_mult_a, t_mult_b, t_mult_a_min, t_mult_b_max;
   int p;
   int world_rank, world_size;
 
   MPI_Init(&argc, &argv);
   MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
   MPI_Comm_size(MPI_COMM_WORLD, &p);
+
+  t_comm_a = MPI_Wtime();
+  t_mult_a = MPI_Wtime();
+
 
   while (a < argc) {
     if (!strcmp("-m", argv[a])) {
@@ -159,7 +163,7 @@ int main(int argc, char *argv[]) {
     memset(dB, 0x0, (v*2) * w * sizeof(float));
     memset(dC, 0x0, (u*2) * w * sizeof(float));
 
-    gettimeofday(&tv_comm_a, NULL);
+    t_comm_a = MPI_Wtime();
 
     if (world_rank == 0) {
       MPI_Win_post(world_group, 0, win_A);
@@ -200,9 +204,14 @@ int main(int argc, char *argv[]) {
       MPI_Win_wait(win_C);
     }
 
-    gettimeofday(&tv_comm_b, NULL);
+    t_comm_b = MPI_Wtime();
 
-    t_comm += 1000000LL * (tv_comm_b.tv_sec - tv_comm_a.tv_sec) + tv_comm_b.tv_usec - tv_comm_a.tv_usec;
+    MPI_Reduce(&t_comm_a, &t_comm_a_min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&t_comm_b, &t_comm_b_max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    if (world_rank == 0) {
+      t_comm += t_comm_b_max - t_comm_a_min;
+    }
     /* // Debugging printout to validate shearing of A and B. */
     /* for (i = 0; i < u; i++) { */
     /*   printf("dA(%lu,%lu) = ", px, py); */
@@ -224,7 +233,7 @@ int main(int argc, char *argv[]) {
     // Phase 2: Cycle through the blocks and multiply the blocks, shifting A left and B up by one block each iteration.
     size_t d;
     for (d = 0; d < sqrt(b*c); d++) {
-      gettimeofday(&tv_comm_a, NULL);
+      t_comm_a = MPI_Wtime();
 
       memcpy(dA + u * v, dA, u * v * sizeof(float));
       MPI_Win_post(asrc_group, 0, win_dA);
@@ -245,11 +254,16 @@ int main(int argc, char *argv[]) {
       MPI_Win_wait(win_dA);
       MPI_Win_wait(win_dB);
 
-      gettimeofday(&tv_comm_b, NULL);
+      t_comm_b = MPI_Wtime();
 
-      t_comm += 1000000LL * (tv_comm_b.tv_sec - tv_comm_a.tv_sec) + tv_comm_b.tv_usec - tv_comm_a.tv_usec;
+      MPI_Reduce(&t_comm_a, &t_comm_a_min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+      MPI_Reduce(&t_comm_b, &t_comm_b_max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
-      gettimeofday(&tv_mult_a, NULL);
+      if (world_rank == 0) {
+	t_comm += t_comm_b_max - t_comm_a_min;
+      }
+
+      t_mult_a = MPI_Wtime();
 
       // Block multiply A(x,y) by B(x,y).
       for (i = 0; i < u; i++) {
@@ -260,10 +274,14 @@ int main(int argc, char *argv[]) {
 	}
       }
 
-      gettimeofday(&tv_mult_b, NULL);
+      t_mult_b = MPI_Wtime();
 
-      t_mult += 1000000LL * (tv_mult_b.tv_sec - tv_mult_a.tv_sec) + tv_mult_b.tv_usec - tv_mult_a.tv_usec;
+      MPI_Reduce(&t_mult_a, &t_mult_a_min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+      MPI_Reduce(&t_mult_b, &t_mult_b_max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
 
+      if (world_rank == 0) {
+	t_mult += t_mult_b_max - t_mult_a_min;
+      }
       /* for (i = 0; i < u; i++) { */
       /*   printf("dA(%lu,%lu) = ", px, py); */
       /*   for (j = 0; j < v; j++) { */
@@ -291,6 +309,8 @@ int main(int argc, char *argv[]) {
 
     // Copy results from device back to host.
     // Send block dC(px,py) to C(px,py).
+    t_comm_a = MPI_Wtime();
+
     if (world_rank == 0) {
       MPI_Win_post(world_group, 0, win_C);
     }
@@ -299,23 +319,37 @@ int main(int argc, char *argv[]) {
     for (k = 0; k < u; k++) {
       size_t off = (px * u * n + k * n + py * w);
       MPI_Put(dC + k * w, w, MPI_FLOAT, 0, off, w, MPI_FLOAT, win_C);
-    }    
+    }
     MPI_Win_complete(win_C);
 
     if (world_rank == 0) {
       MPI_Win_wait(win_C);
-
-      for (i = 0; i < m; i++) {
-	printf("C = ");
-	for (j = 0; j < n; j++) {
-	  printf("%f ", C[i * n + j]);
-	}
-	printf("\n");
-      }
     }
+
+    t_comm_b = MPI_Wtime();
+
+    MPI_Reduce(&t_comm_a, &t_comm_a_min, 1, MPI_DOUBLE, MPI_MIN, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&t_comm_b, &t_comm_b_max, 1, MPI_DOUBLE, MPI_MAX, 0, MPI_COMM_WORLD);
+
+    if (world_rank == 0) {
+      t_comm += t_comm_b_max - t_comm_a_min;
+    }
+
+    /* if (world_rank == 0) { */
+    /*   for (i = 0; i < m; i++) { */
+    /* 	printf("C = "); */
+    /* 	for (j = 0; j < n; j++) { */
+    /* 	  printf("%f ", C[i * n + j]); */
+    /* 	} */
+    /* 	printf("\n"); */
+    /*   } */
+    /* } */
+
     // Report timing results.
     double flops = 2.0 * m * n * q;
-    fprintf(stdout, "%d,%lu,%lu,%d,%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", p, px, py, world_rank, m, q, n, s, flops, flops * 1e-9 / (t_mult * 1e-6), t_mult * 0.001, t_comm * 0.001);
+    if (world_rank == 0) {
+      fprintf(stdout, "%d,%lu,%lu,%d,%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", p, px, py, world_rank, m, q, n, s, flops, flops * 1e-9 / t_mult, t_mult * 1000, t_comm * 1000);
+    }
   }
 
   if (A) free(A);
