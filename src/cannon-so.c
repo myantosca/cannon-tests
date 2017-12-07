@@ -144,9 +144,9 @@ int main(int argc, char *argv[]) {
   MPI_Win win_dA, win_dB, win_C, win_A, win_B;
   MPI_Win_create(dA, u * v * sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &win_dA);
   MPI_Win_create(dB, v * w * sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &win_dB);
-  MPI_Win_create(C, m * n * sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &win_C);
-  MPI_Win_create(A, m * q * sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &win_A);
-  MPI_Win_create(B, q * n * sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &win_B);
+  MPI_Win_create(C, world_rank != 0 ? 0 : m * n * sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &win_C);
+  MPI_Win_create(A, world_rank != 0 ? 0 : m * q * sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &win_A);
+  MPI_Win_create(B, world_rank != 0 ? 0 : q * n * sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &win_B);
   int e;
 
   for (e = 0; e < s; e++) {
