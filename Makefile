@@ -23,6 +23,7 @@ mkl_cblas_sgemm:
 cannon:
 	@make -C src
 	@cp src/cannon-su-acc .
+	@cp src/cannon-so .
 
 superclean: clean superclean-doc-$(PROPOSAL_FNAME_BASE) superclean-doc-$(REPORT_FNAME_BASE)
 
@@ -34,6 +35,7 @@ clean: clean-doc-$(PROPOSAL_FNAME_BASE) clean-doc-$(REPORT_FNAME_BASE)
 	@rm -f matrixMulCUBLAS
 	@rm -f mkl_cblas_sgemm
 	@rm -f cannon-su-acc
+	@rm -f cannon-so
 	@make -C src clean
 	@make -C 3pty/matrixMulCUBLAS clean
 	@make -C 3pty/mkl_cblas_sgemm clean
