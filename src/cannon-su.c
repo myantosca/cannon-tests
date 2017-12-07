@@ -269,7 +269,7 @@ int main(int argc, char *argv[]) {
     gettimeofday(&tv_comm_a, NULL);
     // Cycle A and B.
     for (y = 0; y <= c; y++) {
-      #pragma acc kernels num_gangs(b) num_workers(u)
+      //#pragma acc kernels num_gangs(b) num_workers(u) device_ptr(dA,dB)
       for (x = 0; x < b; x++) {
 	// Shift A(x,y) left 1 block.
 #ifdef OMP
@@ -294,7 +294,6 @@ int main(int argc, char *argv[]) {
 #endif
       }
     }
-
 
     for (x = 0; x <= b + 1; x++) {
 #ifdef OMP
@@ -325,21 +324,26 @@ int main(int argc, char *argv[]) {
 #ifdef OMP
     #pragma omp target parallel for device(target_device) num_threads(b) private(x) is_device_ptr(dC,dA,dB)
 #endif
-#ifdef ACC
-    #pragma acc kernels num_gangs(b) num_workers(c) deviceptr(dC,dA,dB)
-#endif
+
     // Multiply all the blocks for the present iteration.
     for (x = 0; x < b; x++) {
 #ifdef OMP
       #pragma omp parallel for num_threads(c) private(y) private(i) private(k) private(j) firstprivate(x)
 #endif
-      for (y = 0; y < c; y++) {
 	// Block multiply A(x,y) by B(x,y).
-	for (i = 0; i < u; i++) {
+        //# pragma omp parallel loop firstprivate(x,y) private(i,k,j) shared(u,v,w,dC[x*u*n:(x+1)*u*n-1],dA[x*u*(q+v):(x+1)*u*(q+v)-1],dB[(x+1)*v*n:(x+2)*v*n])
+      for (i = 0; i < u; i++) {
+        # pragma acc parallel firstprivate(x,i) private(y,k,j) deviceptr(dC,dA,dB)
+	for (y = 0; y < c; y++) {
+	  size_t coff = x * u * n + i * n + y * w;
+	  size_t aoff = x * u * (q+v) + i * (q+v) + (y+1) * v;
+	  size_t boff = (x+1) * v * n + y * w;
 	  for (k = 0; k < v; k++) {
-	    for (j = 0; j < w; j++) {
+            //# pragma omp parallel for firstprivate(x,y,i,k) private(i,j,k) shared(u,v,w) default(none)
+ 	    for (j = 0; j < w; j++) {
 	      //printf("[%lu] %f + ", x * u * n + i * n + y * w + j, dC[x * u * n + i * n + y * w + j]);
-	      dC[x * u * n + i * n + y * w + j] += dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k] * dB[(x+1) * v * n + k * n + y * w + j];
+	      //dC[x * u * n + i * n + y * w + j] += dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k] * dB[(x+1) * v * n + k * n + y * w + j];
+	      dC[coff + j] += dA[aoff + k] * dB[boff +  k * n + j];
 	      //printf("%f * %f = %f\n", dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k], dB[(x+1) * v * n + k * n + y * w + j], dC[x * u * n + i * n + y * w + j]);
 	    }
 	  }
