@@ -8,12 +8,13 @@ cannon-su-omp: cannon-su.c
 	@$(CC) -g -DOMP -fno-stack-protector -foffload=nvptx-none -fopenmp $^ -o $@ -lm -lgomp
 
 cannon-su-acc: cannon-su.c
-	pgcc -g $(ACC_INCS) -DACC $^ -o $@ $(ACC_LIBS) -lm
+	@pgcc -g $(ACC_INCS) -DACC $^ -o $@ $(ACC_LIBS) -lm
 
 cannon-so: cannon-so.c
 	@$(MPICC) -g $^ -o $@ -lm -lmpi -lnuma
 
 clean:
+	@rm -f *~
 	@rm -f cannon-su-acc
 	@rm -f cannon-su-omp
 	@rm -f cannon-so
