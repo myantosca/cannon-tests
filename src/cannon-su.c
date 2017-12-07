@@ -383,13 +383,13 @@ int main(int argc, char *argv[]) {
 
   t_comm += 1000000LL * (tv_comm_b.tv_sec - tv_comm_a.tv_sec) + tv_comm_b.tv_usec - tv_comm_a.tv_usec;
 
-  for (i = 0; i < m; i++) {
-    printf("C = ");
-    for (j = 0; j < n; j++) {
-      printf("%f ", C[i * n + j]);
-    }
-    printf("\n");
-  }
+  /* for (i = 0; i < m; i++) { */
+  /*   printf("C = "); */
+  /*   for (j = 0; j < n; j++) { */
+  /*     printf("%f ", C[i * n + j]); */
+  /*   } */
+  /*   printf("\n"); */
+  /* } */
 
   // Report timing results.
   double flops = 2.0 * m * n * q;
