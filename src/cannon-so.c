@@ -5,14 +5,6 @@
 #include <sys/time.h>
 #include <mpi.h>
 
-#ifdef OMP
-#include <omp.h>
-#endif
-
-#ifdef ACC
-#include <accel.h>
-#endif
-
 int main(int argc, char *argv[]) {
   int a = 1, m = 256, q = 256, n = 256, s = 1;
   float *A = NULL, *B = NULL, *C = NULL;
