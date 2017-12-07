@@ -1,17 +1,17 @@
 CC=gcc-7
 MPICC=mpicc
 ACC_INCS=-I/opt/pgi/linux-86-64/2017/include
-
-all: cannon-su-acc
+ACC_LIBS=-L/opt/pgi/linux-86-64/2017/lib
+all: cannon-su-acc cannon-so
 
 cannon-su-omp: cannon-su.c
 	@$(CC) -g -DOMP -fno-stack-protector -foffload=nvptx-none -fopenmp $^ -o $@ -lm -lgomp
 
 cannon-su-acc: cannon-su.c
-	pgcc -g $(ACC_INCS) -DACC $^ -o $@ -lm
+	pgcc -g $(ACC_INCS) -DACC $^ -o $@ $(ACC_LIBS) -lm
 
 cannon-so: cannon-so.c
-	@$(MPICC) -g $^ -o $@ -lm -lmpi
+	@$(MPICC) -g $^ -o $@ -lm -lmpi -lnuma
 
 clean:
 	@rm -f cannon-su-acc
