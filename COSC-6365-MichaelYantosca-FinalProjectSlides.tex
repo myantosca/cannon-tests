@@ -1,0 +1,245 @@
+\documentclass{beamer}
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage{alltt}
+\usetheme{Warsaw}
+\author{Michael Yantosca}
+\institute{University of Houston}
+\date{December 7, 2017}
+\title[Cannon's Algorithm: Scale-Up vs. Scale-Out]{Cannon's Algorithm for Matrix Multiplication\\Scale Up or Scale Out?}
+\usepackage[utf8]{luainputenc}
+\usepackage[bibencoding=utf8,backend=biber]{biblatex}
+\addbibresource{COSC-6365-MichaelYantosca-FinalProjectReport.bib}
+\begin{document}
+\begin{frame}
+  \titlepage
+\end{frame}
+\begin{frame}{Scale-Up vs. Scale-Out}
+  To explore the relative merits between single-node computer power in depth versus multi-node compute power in breadth,
+  I propose an experiment comparing the performance and efficiency of Cannon's algorithm\autocites{Lecture17Slides,GuptaSadayappan} for the matrix multiplication
+  problem $C = A \times B$ between a single-node OpenMP implementation utilizing accelerators and a multi-node MPI
+  implementation spread across a cluster.
+\end{frame}
+\begin{frame}{Data}
+  \begin{itemize}
+  \item{$C$-stationary case}
+  \item{Limited number of matrix sizes}
+    \begin{itemize}
+    \item{256x256}
+    \item{1024x1024}
+    \item{4096x4096}
+    \item{16384x16384}
+    \item{256x1024}
+    \item{256x4096}
+    \item{256x16384}
+    \item{16384x256}
+    \item{16384x256}
+    \item{4096x256}
+    \item{1024x256}
+    \end{itemize}
+  \item{Performance trials: random numbers}
+  \item{Validation trials: specially devised $A$ and $B$ so each cell of product $C$ has a unique value}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Resources}
+  \begin{itemize}
+  \item{Scale-Up}
+    \begin{itemize}
+    \item{OpenMP offloading to GPU nodes on BRIDGES}
+    \item{backup: OpenACC offloading to GPU nodes on BRIDGES}
+    \item{backup to the backup: CUDA offloading to GPU nodes on BRIDGES}
+    \item{if time permits: OpenMP on KNL nodes on STAMPEDE2}
+    \end{itemize}
+  \item{Scale-Out}
+    \begin{itemize}
+    \item{MPI distribution over non-accelerated nodes on BRIDGES}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Efficiency: Scale-Out (MPI)}
+  \begin{itemize}
+  \item{Strong-scaling roofline model}
+  \item{Basis: single non-GPU node on BRIDGES}
+    \begin{itemize}
+    \item{2.30 GHz Intel E5-2695 (28-cores)}
+    \item{2.30 GHz * 28 cores * 4 SIMD instructions/cycle (AVX256) = 257.6 GFLOPs/s/node}
+    \item{Empirical reference: MKL \texttt{cblas\_sgemm}}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Efficiency: Scale-Up (OpenMP/OpenACC)}
+  \begin{itemize}
+  \item{accelerator roofline based on published specs}
+  \item{NVIDIA P100}
+    \begin{itemize}
+      \item{9.3 SP TFLOPs/s/card\autocite{P100Datasheet}}
+    \end{itemize}
+  \item{NVIDIA K80}
+    \begin{itemize}
+      \item{8.74 TFLOPs/s/card\autocite{AnandtechK80}}
+    \end{itemize}
+  \item{Empirical reference: tweaked matrixMulCUBLAS sample provided with CUDA toolkit}
+  \item{KNL (STAMPEDE2)}
+    \begin{itemize}
+      \item{1.4 GHz * 68 cores * 8 SIMD instructions/cycle (AVX512) = 761.6 GFLOPs/s/node\autocite{Stampede2UserGuide}\footnote{While KNL supports 4 threads/core, only 1 is considered here as performance may degrade over shared resources.}}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Hypotheses}
+  \begin{itemize}
+  \item{OpenMP/OpenACC solution will outperform the MPI solution for smaller matrix sizes.}
+  \item{Scale-Out will outperform Scale-Up when local contention for resources exceeds the communication overhead across nodes.}
+  \item{The inflection point will depend on the hierarchical layout of the accelerator in use.}
+    \begin{itemize}
+      \item{Any loss of data parallelism where the accelerator has to run sequential loops will kill performance.}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Validation: The Goal}
+  \begin{itemize}
+  \item{First priority is to catch logic errors early.}
+  \item{Exacting constraints}
+    \begin{itemize}
+    \item{Each cell of $C$ has a unique value.}
+    \item{Per-cell validation must run in constant time.}
+      \begin{itemize}
+        \item{Ideally, $f(i,j) = \displaystyle\sum_{k=1}^{N} A_{i,k} \cdot B_{k,j}$.}
+      \end{itemize}
+    \item{The validation should protect against row and column drift.}
+    \end{itemize}
+  \item{Inspiration: $iq +j$ (C 2D array index offset calc\autocite[][113]{KnR})}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Validation: A Cautionary Tale}
+  \begin{itemize}
+  \item{Spent an inordinate amount of time wrestling with the algebra.}
+  \item{Refined solution}
+    \begin{itemize}
+    \item{$A$ populated with row index $i$}
+    \item{$B$ = [\textbf{1}\ \textbf{1}\ \ldots\ \textbf{1}]}
+    \item{$C_{0}$ = [\textbf{0}\ \textbf{1}\ \ldots\ \textbf{n}]}
+    \item{$C = A \times B + C_{0}$}
+    \item{$C$ populated with $iq + j$}
+    \end{itemize}
+  \item{Good?}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Validation: A Cautionary Tale}
+  \begin{itemize}
+  \item{$B$ is a homogeneous field of ones.}
+  \item{No protection against column drift!}
+  \item{Refined solution}
+    \begin{itemize}
+    \item{$A$ populated with $(i + 1)$}
+    \item{$B$ = [\textbf{0}\ \textbf{1}\ \ldots\ \textbf{n}]}
+    \item{$C_{0}$ populated with $-((q-1)j + (j-1)iq)$}
+    \item{$C = A \times B + C_{0}$}
+    \item{$C$ populated with $iq + j$}
+    \end{itemize}
+  \item{Good?}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Validation: A Cautionary Tale}
+  \begin{itemize}
+  \item{Single-precision floating point exact integer precision range: [$-2^{24}$,$2^{24}$]\autocite{SPIntLimit}}
+  \item{Method requires upper bound of $16383 \times 16383 + 16382 \times 16383 \times 16384$, i.e., something on the order of $2^{42}$}
+  \item{Attempts to compress this range by reducing $i$ and $j$ failed miserably.}
+  \item{Fidelity loss in fractions as bad as loss between large numbers.}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Validation: The Outcome}
+  \begin{itemize}
+  \item{Fell back on $A$ = \textbf{1}, $B$ = \textbf{1}, $C_{0}$ = \textbf{0}}
+  \item{Checked that $C$ = \textbf{q}}
+  \item{Did manual tests with small matrices on Cannon's algorithm implementations.}
+    \begin{itemize}
+    \item{e.g., $A$ and $B$ populated with $iq + j$ for 2x2 and 4x4 matrices}
+    \end{itemize}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Scale-Up: Implementation}
+  \begin{itemize}
+  \item{Started with OpenMP implementation}
+  \item{No support for GPU offloading via OpenMP on BRIDGES, even with gcc-7.2}
+  \item{Ported implementation to OpenACC}
+  \item{Had to use PGI compiler}
+    \begin{itemize}
+    \item{BRIDGES supports PGI\autocite{BridgesGPUGuide}}
+    \item{gcc 7 has no support for nested acc loops or host fallback!\autocite{gccOpenACC}}
+    \end{itemize}
+  \item{Missed adding \texttt{-acc} flag to \texttt{Makefile}}
+    \begin{itemize}
+    \item{Wasn't actually offloading to GPU}
+    \item{Finally got it to compile and loops could not be parallelized.}
+      \begin{itemize}
+      \item{Dependency on loop variables for matrix offset indexing.}
+      \end{itemize}
+    \item{Still working out bugs.}
+    \end{itemize}
+\end{itemize}
+\end{frame}
+\begin{frame}{Scale-Up: Algorithmic Notes}
+  \begin{itemize}
+  \item{Device matrix $dA$ allocates an extra block column for temporarily storing wraparound rotation.}
+  \item{Device matrix $dB$ allocates an extra block row for temporarily storing wraparound rotation.}
+  \item{The rotation loop iterates one more than the corresponding processor grid dimension.}
+  \item{Host matrices $A$, $B$, and $C$ and device matrices $dA$, $dB$ and $dC$ are allocated as single blocks.}
+    \begin{itemize}
+    \item{Subarrays are accessed by calculating the appropriate row-major offset.}
+    \item{NB: Processor grid dimensions $x$ and $y$ start at 1.}
+    \end{itemize}
+  \item{Local multiplication is implemented as a typical $ikj$ block multiplication.}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Scale-Out: Implementation}
+  \begin{itemize}
+  \item{Started with port of OpenACC scale-up implementation to MPI framework.}
+  \item{Employed RMA communication between nodes for initial shearing and cyclic rotation.}
+  \item{Synchronization is Post-Start-Complete-Wait.}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Scale-Out: Phase 0 (Allocation)}
+  \begin{itemize}
+    \item{Root process $P_{0,0}$ fills $A$ and $B$ and zeroes out $C$.}
+    \item{Root process $P_{0,0}$ sets up communication windows for $A$, $B$, and $C$}
+    \item{Non-root processes $P_{x\neq0,y\neq0}$ set up null communication windows for $A$, $B$, and $C$.}
+    \item{All processes $P_{x,y}$ allocate $dA$, $dB$, and $dC$ and set up communication windows for $dA$ and $dB$.\footnote{$dA$ and $dB$ are allotted double the required space to provide a ghost block/send buffer to avoid corruption during cyclic rotation.}}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Scale-Out: Phase 1 (Shearing)}
+  \begin{itemize}
+  \item{Root process $P_{0,0}$ issues \texttt{MPI\_Win\_post} call to \texttt{MPI\_COMM\_WORLD}.}
+  \item{All processes $P_{x,y}$ issue \texttt{MPI\_Win\_start}, \texttt{MPI\_Get}, and \texttt{MPI\_Win\_complete} for $A_{x,(y+x)\ mod\ c}$, $B_{(x+y)\ mod\ b, y}$, and $C_{x,y}$.}
+  \item{Root process $P_{0,0}$ issues \texttt{MPI\_Win\_wait}.}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Scale-Out: Phase 2 (Rotate-Multiply-Add)}
+  \begin{itemize}
+    \item{Loop until $P_{x,y}$ has processed each row $x$ and column $y$ at most once.}
+      \begin{itemize}
+      \item{Cyclic rotation}
+        \begin{itemize}
+        \item{$P_{x,y}$ copies its present copies of $dA$ and $dB$ to the respective ghost blocks.}
+        \item{$P_{x,y}$ issues corresponding \texttt{MPI\_Win\_post} calls to its east and south neighbors.}
+        \item{$P_{x,y}$ issues \texttt{MPI\_Win\_start} calls on $dA$ and $dB$ to its west and north neighbors, respectively.}
+        \item{$P_{x,y}$ sends its present copies of $dA$ and $dB$ to its west and north neighbors, respectively.}
+        \item{$P_{x,y}$ awaits new copies of $dA$ and $dB$ from its east and south neighbors, respectively.}
+        \end{itemize}
+      \item{All processes $P_{x,y}$ perform local $ikj$ block multiplication.}
+      \end{itemize}
+  \end{itemize}
+\end{frame}
+\begin{frame}{Conclusions?}
+  \begin{itemize}
+  \item{Don't get stuck in the realm of sunk-cost fallacy.}
+    \begin{itemize}
+      \item{Know when to cut losses and move on.}
+    \end{itemize}
+  \item{Local block multiplication makes it extremely difficult to generalize Cannon's algorithm to non-square matrices.}
+  \item{Experimental results still pending.}
+  \end{itemize}
+\end{frame}
+\begin{frame}[allowframebreaks]{References}
+  \printbibliography
+\end{frame}
+\end{document}
