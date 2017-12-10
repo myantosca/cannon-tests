@@ -4,9 +4,9 @@
 #include <math.h>
 #include <sys/time.h>
 
-#ifdef OMP
+//#ifdef OMP
 #include <omp.h>
-#endif
+//#endif
 
 #ifdef ACC
 #include <accel.h>
@@ -353,24 +353,24 @@ int main(int argc, char *argv[]) {
 
     // Multiply all the blocks for the present iteration.
     // Block multiply A(x,y) by B(x,y).
-#pragma acc kernels deviceptr(dC,dA,dB)
+#pragma omp parallel for num_threads(b)
     for (x = 0; x < b; x++) {
-#pragma acc loop independent
+#pragma omp parallel for num_threads(c)
       for (y = 0; y < c; y++) {
+#pragma acc kernels deviceptr(dC,dA,dB)
+        for (i = 0; i < u; i++) {
 #pragma acc loop independent
-	for (i = 0; i < u; i++) {
-#pragma acc loop independent
-	  for (k = 0; k < v; k++) {
-#pragma acc loop independent
-	    for (j = 0; j < w; j++) {
-	      *(dC + x * u * n + y * w + i * n + j) += dA[x * u * (q+v) + (y+1) * v + i * (q+v) + k] * dB[(x+1) * v * n + y * w +  k * n + j];
+          for (j = 0; j < w; j++) {
+            float sum = 0.0;
+#pragma acc loop reduction (+:sum)
+	    for (k = 0; k < v; k++) {
+	      sum += dA[x * u * (q+v) + (y+1) * v + i * (q+v) + k] * dB[(x+1) * v * n + y * w +  k * n + j];
 	    }
-	  }
-	}
+	    *(dC + x * u * n + y * w + i * n + j) += sum;
+          }
+        }
       }
     }
-
-
     gettimeofday(&tv_mult_b, NULL);
 
     t_mult += 1000000LL * (tv_mult_b.tv_sec - tv_mult_a.tv_sec) + tv_mult_b.tv_usec - tv_mult_a.tv_usec;
