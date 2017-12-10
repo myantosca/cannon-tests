@@ -127,7 +127,7 @@ int main(int argc, char *argv[]) {
 
   // Phase 1: Offload the matrices to the target device and skew the matrices A and B.
   // If there is no target device, copy and skew to a location in host memory.
-  float *dA, *dB, *dC;
+  float *restrict dA, *restrict dB, *restrict dC;
 
 #ifdef OMP
   // Allocate A with ghost column.
@@ -325,31 +325,52 @@ int main(int argc, char *argv[]) {
     #pragma omp target parallel for device(target_device) num_threads(b) private(x) is_device_ptr(dC,dA,dB)
 #endif
 
+/*     // Multiply all the blocks for the present iteration. */
+/*     for (x = 0; x < b; x++) { */
+/* #ifdef OMP */
+/*       #pragma omp parallel for num_threads(c) private(y) private(i) private(k) private(j) firstprivate(x) */
+/* #endif */
+/* 	// Block multiply A(x,y) by B(x,y). */
+/*         //# pragma omp parallel loop firstprivate(x,y) private(i,k,j) shared(u,v,w,dC[x*u*n:(x+1)*u*n-1],dA[x*u*(q+v):(x+1)*u*(q+v)-1],dB[(x+1)*v*n:(x+2)*v*n]) */
+/*       for (i = 0; i < u; i++) { */
+/*         # pragma acc parallel firstprivate(x,i) private(y,k,j) deviceptr(dC,dA,dB) */
+/* 	for (y = 0; y < c; y++) { */
+/* 	  size_t coff = x * u * n + i * n + y * w; */
+/* 	  size_t aoff = x * u * (q+v) + i * (q+v) + (y+1) * v; */
+/* 	  size_t boff = (x+1) * v * n + y * w; */
+/* 	  for (k = 0; k < v; k++) { */
+/*             //# pragma omp parallel for firstprivate(x,y,i,k) private(i,j,k) shared(u,v,w) default(none) */
+/*  	    for (j = 0; j < w; j++) { */
+/* 	      //printf("[%lu] %f + ", x * u * n + i * n + y * w + j, dC[x * u * n + i * n + y * w + j]); */
+/* 	      //dC[x * u * n + i * n + y * w + j] += dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k] * dB[(x+1) * v * n + k * n + y * w + j]; */
+/* 	      dC[coff + j] += dA[aoff + k] * dB[boff +  k * n + j]; */
+/* 	      //printf("%f * %f = %f\n", dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k], dB[(x+1) * v * n + k * n + y * w + j], dC[x * u * n + i * n + y * w + j]); */
+/* 	    } */
+/* 	  } */
+/* 	} */
+/*       } */
+/*     } */
+
     // Multiply all the blocks for the present iteration.
+    // Block multiply A(x,y) by B(x,y).
+#pragma acc parallel private(x,y,i,k,j) deviceptr(dC,dA,dB)
     for (x = 0; x < b; x++) {
-#ifdef OMP
-      #pragma omp parallel for num_threads(c) private(y) private(i) private(k) private(j) firstprivate(x)
-#endif
-	// Block multiply A(x,y) by B(x,y).
-        //# pragma omp parallel loop firstprivate(x,y) private(i,k,j) shared(u,v,w,dC[x*u*n:(x+1)*u*n-1],dA[x*u*(q+v):(x+1)*u*(q+v)-1],dB[(x+1)*v*n:(x+2)*v*n])
-      for (i = 0; i < u; i++) {
-        # pragma acc parallel firstprivate(x,i) private(y,k,j) deviceptr(dC,dA,dB)
-	for (y = 0; y < c; y++) {
-	  size_t coff = x * u * n + i * n + y * w;
-	  size_t aoff = x * u * (q+v) + i * (q+v) + (y+1) * v;
-	  size_t boff = (x+1) * v * n + y * w;
+#pragma acc loop independent
+      for (y = 0; y < c; y++) {
+#pragma acc loop independent
+	for (i = 0; i < u; i++) {
+#pragma acc loop independent
 	  for (k = 0; k < v; k++) {
-            //# pragma omp parallel for firstprivate(x,y,i,k) private(i,j,k) shared(u,v,w) default(none)
- 	    for (j = 0; j < w; j++) {
-	      //printf("[%lu] %f + ", x * u * n + i * n + y * w + j, dC[x * u * n + i * n + y * w + j]);
-	      //dC[x * u * n + i * n + y * w + j] += dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k] * dB[(x+1) * v * n + k * n + y * w + j];
-	      dC[coff + j] += dA[aoff + k] * dB[boff +  k * n + j];
-	      //printf("%f * %f = %f\n", dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k], dB[(x+1) * v * n + k * n + y * w + j], dC[x * u * n + i * n + y * w + j]);
+#pragma acc loop independent
+	    for (j = 0; j < w; j++) {
+	      *(dC + x * u * n + y * w + i * n + j) += dA[x * u * (q+v) + (y+1) * v + i * (q+v) + k] * dB[(x+1) * v * n + y * w +  k * n + j];
 	    }
 	  }
 	}
       }
     }
+
+
     gettimeofday(&tv_mult_b, NULL);
 
     t_mult += 1000000LL * (tv_mult_b.tv_sec - tv_mult_a.tv_sec) + tv_mult_b.tv_usec - tv_mult_a.tv_usec;
