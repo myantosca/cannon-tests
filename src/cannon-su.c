@@ -353,7 +353,7 @@ int main(int argc, char *argv[]) {
 
     // Multiply all the blocks for the present iteration.
     // Block multiply A(x,y) by B(x,y).
-#pragma acc parallel private(x,y,i,k,j) deviceptr(dC,dA,dB)
+#pragma acc kernels deviceptr(dC,dA,dB)
     for (x = 0; x < b; x++) {
 #pragma acc loop independent
       for (y = 0; y < c; y++) {
