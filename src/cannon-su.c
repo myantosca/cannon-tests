@@ -325,49 +325,43 @@ int main(int argc, char *argv[]) {
     #pragma omp target parallel for device(target_device) num_threads(b) private(x) is_device_ptr(dC,dA,dB)
 #endif
 
-/*     // Multiply all the blocks for the present iteration. */
-/*     for (x = 0; x < b; x++) { */
-/* #ifdef OMP */
-/*       #pragma omp parallel for num_threads(c) private(y) private(i) private(k) private(j) firstprivate(x) */
-/* #endif */
-/* 	// Block multiply A(x,y) by B(x,y). */
-/*         //# pragma omp parallel loop firstprivate(x,y) private(i,k,j) shared(u,v,w,dC[x*u*n:(x+1)*u*n-1],dA[x*u*(q+v):(x+1)*u*(q+v)-1],dB[(x+1)*v*n:(x+2)*v*n]) */
-/*       for (i = 0; i < u; i++) { */
-/*         # pragma acc parallel firstprivate(x,i) private(y,k,j) deviceptr(dC,dA,dB) */
-/* 	for (y = 0; y < c; y++) { */
-/* 	  size_t coff = x * u * n + i * n + y * w; */
-/* 	  size_t aoff = x * u * (q+v) + i * (q+v) + (y+1) * v; */
-/* 	  size_t boff = (x+1) * v * n + y * w; */
-/* 	  for (k = 0; k < v; k++) { */
-/*             //# pragma omp parallel for firstprivate(x,y,i,k) private(i,j,k) shared(u,v,w) default(none) */
-/*  	    for (j = 0; j < w; j++) { */
-/* 	      //printf("[%lu] %f + ", x * u * n + i * n + y * w + j, dC[x * u * n + i * n + y * w + j]); */
-/* 	      //dC[x * u * n + i * n + y * w + j] += dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k] * dB[(x+1) * v * n + k * n + y * w + j]; */
-/* 	      dC[coff + j] += dA[aoff + k] * dB[boff +  k * n + j]; */
-/* 	      //printf("%f * %f = %f\n", dA[x * u * (q+v) + i * (q+v) + (y+1) * v + k], dB[(x+1) * v * n + k * n + y * w + j], dC[x * u * n + i * n + y * w + j]); */
-/* 	    } */
-/* 	  } */
-/* 	} */
-/*       } */
-/*     } */
-
     // Multiply all the blocks for the present iteration.
     // Block multiply A(x,y) by B(x,y).
-#pragma omp parallel for num_threads(b)
-    for (x = 0; x < b; x++) {
-#pragma omp parallel for num_threads(c)
-      for (y = 0; y < c; y++) {
+/* #pragma omp parallel for num_threads(b) */
+/*     for (x = 0; x < b; x++) { */
+/* #pragma omp parallel for num_threads(c) */
+/*       for (y = 0; y < c; y++) { */
+/*     size_t g; */
+/* #pragma acc kernels deviceptr(dC,dA,dB) */
+/*     for (g = 0; g < b * c; g++) { */
+/*       x = g / b; */
+/*       y = g % b; */
 #pragma acc kernels deviceptr(dC,dA,dB)
-        for (i = 0; i < u; i++) {
+    for (i = 0; i < u; i++) {
+#pragma acc loop independent
+    for (x = 0; x < b; x++) {
+#pragma acc loop independent
+      for (y = 0; y < c; y++) {
+	size_t coff = x * u * n + y * w;
+	size_t aoff = x * u * (q+v) + (y+1) * v;
+	size_t boff = (x+1) * v * n + y * w;
+/* #pragma acc loop independent */
+/*           for (j = 0; j < w; j++) { */
+/*             float sum = 0.0; */
+/* #pragma acc loop reduction (+:sum) */
+/* 	    for (k = 0; k < v; k++) { */
+/* 	      sum += dA[x * u * (q+v) + (y+1) * v + i * (q+v) + k] * dB[(x+1) * v * n + y * w +  k * n + j]; */
+/* 	    } */
+/* 	    *(dC + x * u * n + y * w + i * n + j) += sum; */
+/*           } */
+#pragma acc loop independent
+      for (k = 0; k < v; k++) {
 #pragma acc loop independent
           for (j = 0; j < w; j++) {
-            float sum = 0.0;
-#pragma acc loop reduction (+:sum)
-	    for (k = 0; k < v; k++) {
-	      sum += dA[x * u * (q+v) + (y+1) * v + i * (q+v) + k] * dB[(x+1) * v * n + y * w +  k * n + j];
+	    *(dC + coff + i * n + j) += dA[aoff + i * (q+v) + k] * dB[boff + k * n + j];
 	    }
-	    *(dC + x * u * n + y * w + i * n + j) += sum;
           }
+
         }
       }
     }
