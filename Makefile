@@ -52,4 +52,6 @@ clean-doc-%:
 	@rm -f $*.pyg
 	@rm -f $*-figure*
 	@rm -f $*.toc
-
+	@rm -f $*.out
+	@rm -f $*.snm
+	@rm -f $*.nav

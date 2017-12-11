@@ -15,6 +15,7 @@ cannon-so: cannon-so.c
 
 clean:
 	@rm -f *~
+	@rm -f *.o
 	@rm -f cannon-su-acc
 	@rm -f cannon-su-omp
 	@rm -f cannon-so
