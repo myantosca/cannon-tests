@@ -4,9 +4,7 @@
 #include <math.h>
 #include <sys/time.h>
 
-#ifdef ACC
 #include <accel.h>
-#endif
 
 int main(int argc, char *argv[]) {
   int a = 1, m = 256, q = 256, n = 256, s = 1;
@@ -16,19 +14,15 @@ int main(int argc, char *argv[]) {
   int num_devices, host_device, target_device;
   size_t p;
 
-#ifdef ACC
   host_device = -1;
   target_device = -1;
   num_devices = acc_get_num_devices(acc_device_nvidia);
   p = 1;
-#endif
 
   if (num_devices > 0) {
     target_device = 0;
-#ifdef ACC
     acc_init(acc_device_nvidia);
     acc_set_device_num(target_device, acc_device_nvidia);
-#endif
   }
 
   while (a < argc) {
@@ -48,12 +42,10 @@ int main(int argc, char *argv[]) {
       a++;
       if (a < argc) sscanf(argv[a], "%d", &s);
     }
-#ifdef ACC
     if (!strcmp("-p", argv[a])) {
       a++;
       if (a < argc) sscanf(argv[a], "%d", &p);
     }
-#endif
     a++;
   }
 
@@ -118,31 +110,26 @@ int main(int argc, char *argv[]) {
   // If there is no target device, copy and skew to a location in host memory.
   float *restrict dA, *restrict dB, *restrict dC;
 
-#ifdef ACC
   // Allocate A with ghost column.
   dA = acc_malloc(m * (q+v) * sizeof(float));
   // Allocate B with ghost row.
   dB = acc_malloc((q+v) * n * sizeof(float));
   // Allocate C as-is.
   dC = acc_malloc(m * n * sizeof(float));
-#endif
 
   int e;
   for (e = 0; e < s; e++) {
 
   gettimeofday(&tv_comm_a, NULL);
 
-#ifdef ACC
   // Copy C to target
   acc_memcpy_to_device(dC, C, m * n * sizeof(float));
-#endif
 
   for (x = 0; x < b; x++) {
     for (y = 0; y < c; y++) {
       // Shear block A(x,y) to dA(x,(y-x)%c).
       // A remains in block row major, handled by P(x,y).
 
-#ifdef ACC
       for (k = 0; k < u; k++) {
 	size_t dst_off = x * u * (q+v) + k * (q+v) + (abs((y - x) % c) + 1) * v;
 	size_t src_off = x * u * q + k * q + y * v;
@@ -154,7 +141,6 @@ int main(int argc, char *argv[]) {
 	size_t src_off = x * v * n + k * n + y * w;
 	acc_memcpy_to_device(dB + dst_off, B + src_off, w * sizeof(float));
       }
-#endif
     }
   }
   gettimeofday(&tv_comm_b, NULL);
@@ -206,22 +192,17 @@ int main(int argc, char *argv[]) {
       for (x = 0; x < b; x++) {
 	// Shift A(x,y) left 1 block.
 
-#ifdef ACC
 	#pragma loop independent
 	for (k = 0; k < u; k++) {
 	  size_t dst_off = x * u * (q+v) + k * (q+v) + (y % (c+1)) * v;
 	  size_t src_off = x * u * (q+v) + k * (q+v) + ((y + 1) % (c+1)) * v;
 	  //acc_memcpy_device(dA + dst_off, dA + src_off, v * sizeof(float));
 	}
-#endif
       }
     }
 
     for (x = 0; x <= b + 1; x++) {
-
-#ifdef ACC
       acc_memcpy_device(dB + (x%(b+1)) * v * n, dB + ((x+1)%(b+1)) * v * n, v * n * sizeof(float));
-#endif
     }
 
     gettimeofday(&tv_comm_b, NULL);
@@ -278,9 +259,7 @@ int main(int argc, char *argv[]) {
   gettimeofday(&tv_comm_a, NULL);
 
   // Copy results from device back to host.
-#ifdef ACC
   acc_memcpy_from_device(C, dC, m * n * sizeof(float));
-#endif
 
   gettimeofday(&tv_comm_b, NULL);
 
@@ -301,11 +280,9 @@ int main(int argc, char *argv[]) {
   t_comm = 0;
   }
 
-#ifdef ACC
   if (dA) acc_free(dA);
   if (dB) acc_free(dB);
   if (dC) acc_free(dC);
-#endif
 
   if (A) free(A);
   if (B) free(B);
