@@ -186,17 +186,13 @@ int main(int argc, char *argv[]) {
     /* printf("===========================================\n"); */
     gettimeofday(&tv_comm_a, NULL);
     // Cycle A and B.
-    #pragma acc parallel deviceptr(dA)
     for (y = 0; y <= c; y++) {
-      # pragma loop independent
       for (x = 0; x < b; x++) {
 	// Shift A(x,y) left 1 block.
-
-	#pragma loop independent
 	for (k = 0; k < u; k++) {
 	  size_t dst_off = x * u * (q+v) + k * (q+v) + (y % (c+1)) * v;
 	  size_t src_off = x * u * (q+v) + k * (q+v) + ((y + 1) % (c+1)) * v;
-	  //acc_memcpy_device(dA + dst_off, dA + src_off, v * sizeof(float));
+	  acc_memcpy_device(dA + dst_off, dA + src_off, v * sizeof(float));
 	}
       }
     }
