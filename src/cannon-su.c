@@ -4,10 +4,6 @@
 #include <math.h>
 #include <sys/time.h>
 
-//#ifdef OMP
-#include <omp.h>
-//#endif
-
 #ifdef ACC
 #include <accel.h>
 #endif
@@ -19,13 +15,6 @@ int main(int argc, char *argv[]) {
   long long t_comm = 0, t_mult = 0;
   int num_devices, host_device, target_device;
   size_t p;
-
-#ifdef OMP
-  host_device = omp_get_initial_device();
-  target_device = host_device;
-  num_devices = omp_get_num_devices();
-  p = omp_get_max_threads();
-#endif
 
 #ifdef ACC
   host_device = -1;
@@ -129,15 +118,6 @@ int main(int argc, char *argv[]) {
   // If there is no target device, copy and skew to a location in host memory.
   float *restrict dA, *restrict dB, *restrict dC;
 
-#ifdef OMP
-  // Allocate A with ghost column.
-  dA = (float *)omp_target_alloc(m * (q+v) * sizeof(float), target_device);
-  // Allocate B with ghost row.
-  dB = (float *)omp_target_alloc((q+v) * n * sizeof(float), target_device);
-  // Allocate C as-is.
-  dC = (float *)omp_target_alloc(m * n * sizeof(float), target_device);
-#endif
-
 #ifdef ACC
   // Allocate A with ghost column.
   dA = acc_malloc(m * (q+v) * sizeof(float));
@@ -152,63 +132,15 @@ int main(int argc, char *argv[]) {
 
   gettimeofday(&tv_comm_a, NULL);
 
-#ifdef OMP
-  // Copy C to target
-  omp_target_memcpy(dC, C, m * n * sizeof(float), 0, 0, target_device, host_device);
-#endif
-
 #ifdef ACC
   // Copy C to target
   acc_memcpy_to_device(dC, C, m * n * sizeof(float));
 #endif
 
-#ifdef OMP
-#pragma omp parallel for	   \
-  default(none) num_threads(b)	   \
-  shared(dA) shared(dB) shared(dC) \
-  shared(A) shared(B) shared(C) \
-  shared(host_device) shared(target_device) \
-  shared(b) shared(c) shared(q) shared(u) shared(v) shared(w) \
-  private(x)
-#endif
   for (x = 0; x < b; x++) {
-#ifdef OMP
-#pragma omp parallel for	   \
-  default(none) num_threads(b)	   \
-  shared(dA) shared(dB) shared(dC) \
-  shared(A) shared(B) shared(C)	   \
-  shared(host_device) shared(target_device) \
-  shared(b) shared(c) shared(q) shared(u) shared(v) shared(w) \
-  shared(x) private(y)
-#endif
     for (y = 0; y < c; y++) {
       // Shear block A(x,y) to dA(x,(y-x)%c).
       // A remains in block row major, handled by P(x,y).
-#ifdef OMP
-      omp_target_memcpy_rect(dA, A,                                                // dst, src
-			     sizeof(float),                                        // elem size
-			     2,                                                    // dims
-			     (const size_t[2]){ u, v },                            // volume
-			     (const size_t[2]){ x * u, (abs((y - x) % c) + 1) * v },  // dst offs
-			     (const size_t[2]){ x * u, y * v },                    // src offs
-			     (const size_t[2]){ b * u, (c + 1) * v},               // dst dims
-			     (const size_t[2]){ b * u, c * v },                    // src dims
-			     target_device,                                        // dst device
-			     host_device);                                         // src device
-
-      // Shear block B(y,x) to dB((x-y)%b,x).
-      // B remains in block row major, handled by P(x,y).
-      omp_target_memcpy_rect(dB, B,                                                // dst, src
-			     sizeof(float),                                        // elems
-			     2,                                                    // dims
-			     (const size_t[2]){ v, w },                            // volume
-			     (const size_t[2]){ (abs((x - y) % b) + 1) * v, y * w },  // dst offs
-			     (const size_t[2]){ x * v, y * w },                    // src offs
-			     (const size_t[2]){ (b + 1) * v, c * w },              // dst dims
-			     (const size_t[2]){ b * v, c * w },                    // src dims
-			     target_device,                                        // dst device
-			     host_device);                                         // src device
-#endif
 
 #ifdef ACC
       for (k = 0; k < u; k++) {
@@ -268,47 +200,24 @@ int main(int argc, char *argv[]) {
     /* printf("===========================================\n"); */
     gettimeofday(&tv_comm_a, NULL);
     // Cycle A and B.
+    #pragma acc parallel deviceptr(dA)
     for (y = 0; y <= c; y++) {
-      //#pragma acc kernels num_gangs(b) num_workers(u) device_ptr(dA,dB)
+      # pragma loop independent
       for (x = 0; x < b; x++) {
 	// Shift A(x,y) left 1 block.
-#ifdef OMP
-	omp_target_memcpy_rect(dA, dA,                                               // dst, src
-			       sizeof(float),                                        // elem size
-			       2,                                                    // dims
-			       (const size_t[2]){ u, v },                            // volume
-			       (const size_t[2]){ x * u, (y % (c+1)) * v },          // dst offs
-			       (const size_t[2]){ x * u, ((y + 1) % (c+1)) * v },    // src offs
-			       (const size_t[2]){ b * u, (c + 1) * v },              // dst dims
-			       (const size_t[2]){ b * u, (c + 1) * v },              // src dims
-			       target_device,                                        // dst device
-			       target_device);                                       // src device
-#endif
 
 #ifdef ACC
+	#pragma loop independent
 	for (k = 0; k < u; k++) {
 	  size_t dst_off = x * u * (q+v) + k * (q+v) + (y % (c+1)) * v;
 	  size_t src_off = x * u * (q+v) + k * (q+v) + ((y + 1) % (c+1)) * v;
-	  acc_memcpy_device(dA + dst_off, dA + src_off, v * sizeof(float));
+	  //acc_memcpy_device(dA + dst_off, dA + src_off, v * sizeof(float));
 	}
 #endif
       }
     }
 
     for (x = 0; x <= b + 1; x++) {
-#ifdef OMP
-    // Shift B(x) up 1 block.
-    omp_target_memcpy_rect(dB, dB,                                               // dst, src
-                           sizeof(float),                                        // elems
-                           2,                                                    // dims
-                           (const size_t[2]){ v, c * w },                        // volume
-			   (const size_t[2]){ (x % (b+1)) * v, y * w },          // dst offs
-			   (const size_t[2]){ ((x + 1) % (b+1)) * v, y * w },    // src offs
-			   (const size_t[2]){ (b + 1) * v, c * w },              // dst dims
-			   (const size_t[2]){ (b + 1) * v, c * w },              // src dims
-			   target_device,                                        // dst device
-			   target_device);                                       // src device
-#endif
 
 #ifdef ACC
       acc_memcpy_device(dB + (x%(b+1)) * v * n, dB + ((x+1)%(b+1)) * v * n, v * n * sizeof(float));
@@ -321,21 +230,8 @@ int main(int argc, char *argv[]) {
 
     gettimeofday(&tv_mult_a, NULL);
 
-#ifdef OMP
-    #pragma omp target parallel for device(target_device) num_threads(b) private(x) is_device_ptr(dC,dA,dB)
-#endif
-
     // Multiply all the blocks for the present iteration.
     // Block multiply A(x,y) by B(x,y).
-/* #pragma omp parallel for num_threads(b) */
-/*     for (x = 0; x < b; x++) { */
-/* #pragma omp parallel for num_threads(c) */
-/*       for (y = 0; y < c; y++) { */
-/*     size_t g; */
-/* #pragma acc kernels deviceptr(dC,dA,dB) */
-/*     for (g = 0; g < b * c; g++) { */
-/*       x = g / b; */
-/*       y = g % b; */
 #pragma acc kernels deviceptr(dC,dA,dB)
     for (i = 0; i < u; i++) {
 #pragma acc loop independent
@@ -345,15 +241,6 @@ int main(int argc, char *argv[]) {
 	size_t coff = x * u * n + y * w + i * n;
 	size_t aoff = x * u * (q+v) + (y+1) * v + i * (q+v);
 	size_t boff = (x+1) * v * n + y * w;
-/* #pragma acc loop independent */
-/*           for (j = 0; j < w; j++) { */
-/*             float sum = 0.0; */
-/* #pragma acc loop reduction (+:sum) */
-/* 	    for (k = 0; k < v; k++) { */
-/* 	      sum += dA[aoff + k] * dB[boff +  k * n + j]; */
-/* 	    } */
-/* 	    *(dC + coff + j) += sum; */
-/*           } */
 #pragma acc loop independent
       for (k = 0; k < v; k++) {
 #pragma acc loop independent
@@ -391,9 +278,6 @@ int main(int argc, char *argv[]) {
   gettimeofday(&tv_comm_a, NULL);
 
   // Copy results from device back to host.
-#ifdef OMP
-  omp_target_memcpy(C, dC, m * n * sizeof(float), 0, 0, host_device, target_device);
-#endif
 #ifdef ACC
   acc_memcpy_from_device(C, dC, m * n * sizeof(float));
 #endif
@@ -416,11 +300,6 @@ int main(int argc, char *argv[]) {
   t_mult = 0;
   t_comm = 0;
   }
-#ifdef OMP
-  if (dA) omp_target_free(dA, target_device);
-  if (dB) omp_target_free(dB, target_device);
-  if (dC) omp_target_free(dC, target_device);
-#endif
 
 #ifdef ACC
   if (dA) acc_free(dA);
