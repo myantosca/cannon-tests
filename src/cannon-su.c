@@ -117,6 +117,8 @@ int main(int argc, char *argv[]) {
   // Allocate C as-is.
   dC = acc_malloc(m * n * sizeof(float));
 
+  fprintf(stdout, "p,m,q,n,trials,trial,flops,GF/s,t_mult_ms,t_comm_ms\n");
+
   int e;
   for (e = 0; e < s; e++) {
 
