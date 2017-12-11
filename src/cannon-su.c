@@ -342,23 +342,23 @@ int main(int argc, char *argv[]) {
     for (x = 0; x < b; x++) {
 #pragma acc loop independent
       for (y = 0; y < c; y++) {
-	size_t coff = x * u * n + y * w;
-	size_t aoff = x * u * (q+v) + (y+1) * v;
+	size_t coff = x * u * n + y * w + i * n;
+	size_t aoff = x * u * (q+v) + (y+1) * v + i * (q+v);
 	size_t boff = (x+1) * v * n + y * w;
 /* #pragma acc loop independent */
 /*           for (j = 0; j < w; j++) { */
 /*             float sum = 0.0; */
 /* #pragma acc loop reduction (+:sum) */
 /* 	    for (k = 0; k < v; k++) { */
-/* 	      sum += dA[x * u * (q+v) + (y+1) * v + i * (q+v) + k] * dB[(x+1) * v * n + y * w +  k * n + j]; */
+/* 	      sum += dA[aoff + k] * dB[boff +  k * n + j]; */
 /* 	    } */
-/* 	    *(dC + x * u * n + y * w + i * n + j) += sum; */
+/* 	    *(dC + coff + j) += sum; */
 /*           } */
 #pragma acc loop independent
       for (k = 0; k < v; k++) {
 #pragma acc loop independent
           for (j = 0; j < w; j++) {
-	    *(dC + coff + i * n + j) += dA[aoff + i * (q+v) + k] * dB[boff + k * n + j];
+	    *(dC + coff + j) += dA[aoff + k] * dB[boff + k * n + j];
 	    }
           }
 
