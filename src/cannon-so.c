@@ -341,6 +341,8 @@ int main(int argc, char *argv[]) {
     double flops = 2.0 * m * n * q;
     if (world_rank == 0) {
       fprintf(stdout, "%d,%lu,%lu,%d,%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", p, px, py, world_rank, m, q, n, s, flops, flops * 1e-9 / t_mult, t_mult * 1000, t_comm * 1000);
+      t_comm = 0.0;
+      t_mult = 0.0;
     }
   }
 
