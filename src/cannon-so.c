@@ -149,6 +149,10 @@ int main(int argc, char *argv[]) {
   MPI_Win_create(B, world_rank != 0 ? 0 : q * n * sizeof(float), sizeof(float), MPI_INFO_NULL, MPI_COMM_WORLD, &win_B);
   int e;
 
+  if (world_rank == 0) {
+    fprintf(stdout, "p,m,q,n,trials,trial,flops,GF/s,t_mult_ms,t_comm_ms\n");
+  }
+
   for (e = 0; e < s; e++) {
 
     memset(dA, 0x0, (u*2) * v * sizeof(float));
@@ -340,7 +344,7 @@ int main(int argc, char *argv[]) {
     // Report timing results.
     double flops = 2.0 * m * n * q;
     if (world_rank == 0) {
-      fprintf(stdout, "%d,%lu,%lu,%d,%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", p, px, py, world_rank, m, q, n, s, flops, flops * 1e-9 / t_mult, t_mult * 1000, t_comm * 1000);
+      fprintf(stdout, "%d,%d,%d,%d,%d,%d,%.2lf,%.2lf,%.3lf,%.3lf\n", p, m, q, n, s, e, flops, flops * 1e-9 / t_mult, t_mult * 1000, t_comm * 1000);
       t_comm = 0.0;
       t_mult = 0.0;
     }
