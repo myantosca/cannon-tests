@@ -1,0 +1,73 @@
+Michael Yantosca
+COSC 6365 - Final Project
+=========================
+Pre-build instructions for BRIDGES:
+
+    module load cuda/8.0
+    module load gcc/7.2.0
+    module load pgi
+    export CUDA_PATH=/opt/packages/cuda/8.0/
+
+To build all the requisite executables, simply type the following command:
+   
+    make
+
+Common Variables
+----------------
+A=m x q
+B=q x n
+C=m x n
+<m> = m dimension
+<q> = q dimension
+<n> = n dimension
+<p> = number of processors
+
+NB: m,q,n must be equal, i.e., A,B,C must be square matrices for the current implementation.
+p must be a perfect square that can evenly divide m=q=n.
+Any deviation from these constraints may result in undefined behavior.
+
+matrixMulCUBLAS
+---------------
+
+Usage: ./matrixMulCUBLAS m=<m> q=<q> n=<n> validation=[0|1]
+
+Two sbatch scripts are provided for the matrixMulCUBLAS test harness, one for each type of GPU node:
+
+    sbatch run_matrixMulCUBLAS.p100.sh
+    sbatch run_matrixMulCUBLAS.k80.sh
+
+mkl_cblas_sgemm
+---------------
+
+Usage: ./mkl_cblas_sgemm -m <m> -q <q> -n <n>
+
+One sbatch script is provided for the mkl_cblas_sgemm test harness:
+
+    sbatch run_mkl_blas_sgemm.sh
+
+cannon-so
+---------
+
+Usage: mpirun -np <p> ./cannon-so -m <m> -q <q> -n <n>
+
+One sbatch script is provided for the cannon-so program:
+
+    sbatch run_cannon-so.sh
+
+NB: These sbatch scripts request 8 hours of 12 non-GPU nodes in the RM partition.
+
+cannon-su
+---------
+
+Usage: ./cannon-su -p <p> -m <m> -q <q> -n <n>
+
+Two sbatch scripts are provided for the cannon-su program, one for each type of GPU node:
+
+    sbatch run_cannon-su.p100.sh
+    sbatch run_cannon-su.k80.sh
+
+NB: These sbatch scripts request 8 hours of a single GPU node each.
+
+Contact
+-------
+Please refer any comments, questions, or bug reports to Michael Yantosca <mike@archivarius.net>.
