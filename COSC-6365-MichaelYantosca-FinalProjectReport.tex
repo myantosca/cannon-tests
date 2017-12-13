@@ -1,4 +1,5 @@
 \documentclass{article}
+\usepackage{fontspec}
 \usepackage{mathtools}
 \usepackage{amssymb}
 \usepackage{fancyhdr}
@@ -6,51 +7,81 @@
 \usepackage[utf8]{luainputenc}
 \usepackage[bibencoding=utf8,backend=biber]{biblatex}
 \addbibresource{COSC-6365-MichaelYantosca-FinalProjectReport.bib}
+\usepackage{minted}
+\usepackage{longtable}
+\usepackage{enumerate}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepgfplotslibrary{external}
+\usepgfplotslibrary{statistics}
+\usepgfplotslibrary{groupplots}
+\usetikzlibrary{pgfplots.groupplots}
+\pgfplotsset{
+  tick label style={font=\footnotesize},
+  label style={font=\small},
+  legend style={font=\small},
+  compat=newest
+}
+\pgfplotstableset{
+  col sep=comma,
+  begin table=\begin{longtable},
+  end table=\end{longtable},
+  every head row/.append style={after row=\endhead}
+}
+\pgfplotstableread{./results/cannon.avg.csv}\cannonaverages
+\pgfplotstableread{./results/mkl.avg.s30.csv}\mklaveragesxxx
+\pgfplotstableread{./results/mkl.avg.s10.csv}\mklaveragesx
+\pgfplotstableread{./results/cublas.avg.k80.csv}\cublasaveragesk
+\pgfplotstableread{./results/cublas.avg.p100.csv}\cublasaveragesp
 \pagestyle{fancy}
 \fancyhf{}
-\rhead{COSC-6365 Final Project Proposal}
+\rhead{COSC-6365 Final Project Report}
 \lhead{Michael Yantosca}
 \rfoot{\thepage}
+\newcommand{\todo}[0]{\textbf{\textcolor{red}{TODO}}}
 
 \begin{document}
+
+\tableofcontents
+
 \begin{section}{Abstract}
   To explore the relative merits between single-node computer power in depth versus multi-node compute power in breadth,
-  I propose an experiment comparing the performance and efficiency of Cannon's algorithm\autocites{Lecture17Slides,GuptaSadayappan} for the matrix multiplication
-  problem $C = A \times B$ between a single-node OpenMP implementation utilizing accelerators and a multi-node MPI
+  the author proposed an experiment comparing the performance and efficiency of Cannon's algorithm\autocites{Lecture17Slides,GuptaSadayappan}
+  for the matrix multiplication problem $C = A \times B$ between a single-node OpenMP\autocite{openmp45spec} implementation utilizing accelerators and a multi-node MPI\autocite{MPIReport31}
   implementation spread across a cluster.
   \begin{subsection}{Data}
-    For the sake of time, I will only consider the $C$-stationary case for a limited number of matrix sizes
-    (256x256, 1024x1024, 4096x4096, 16384x16384, 256x1024, 256x4096, 256x16384, 16384x256, 16384x256, 4096x256, 1024x256).
-    The matrices will be filled with random numbers for the performance trials. Validation trials will be made
-    through specially devised matrices $A$ and $B$ such that each cell of the product matrix $C$ will have a unique value.
+    For the sake of time, only the $C$-stationary case for a limited number of matrix sizes
+    (256x256, 1024x1024, 4096x4096, 16384x16384, 256x1024, 256x4096, 256x16384, 16384x256, 16384x256, 4096x256, 1024x256)
+    were considered. The matrices were to be filled with random numbers for the performance trials. Validation trials were to be made
+    through specially devised matrices $A$ and $B$ such that each cell of the product matrix $C$ would have a unique value.
   \end{subsection}
   \begin{subsection}{Resources}
-    The OpenMP trials will be executed on the GPU nodes on BRIDGES\footnote{If the GPU nodes on BRIDGES do not support
-    OpenMP offloading to the P100 and K80 GPUs, the acceleration will be done via OpenACC, or, as a last resort, CUDA.}
-    and/or the KNL nodes on STAMPEDE2, whereas the MPI trials will be executed on the appropriate non-accelerated nodes
+    The OpenMP trials were to be executed on the GPU nodes on BRIDGES\footnote{If the GPU nodes on BRIDGES did not support
+    OpenMP offloading to the P100 and K80 GPUs, the acceleration would be done via OpenACC\autocite{OpenACCStd}, or, as a last resort, CUDA.}
+    and/or the KNL nodes on STAMPEDE2, whereas the MPI trials would be executed on the appropriate non-accelerated nodes
     on BRIDGES.
   \end{subsection}
   \begin{subsection}{Efficiency}
-    The efficiency of the MPI trials will be gauged against a strong-scaling roofline model based on the physical
-    characteristics of a single non-GPU node on BRIDGES. The processor in this case is the 28-core, 2.30 GHz Intel E5-2695,
+    The efficiency of the MPI trials were gauged against a strong-scaling roofline model based on the physical
+    characteristics of a single non-GPU node on BRIDGES. The processor in this case was the 28-core, 2.30 GHz Intel E5-2695,
     which is theoretically capable of 2.30 GHz * 28 cores * 4 SIMD instructions/cycle (AVX256) = 257.6 GFLOPs/s/node.
     \begin{paragraph}{}
-      The efficiency of the OpenMP trials will be gauged against a roofline model based on the physical characteristics of the accelerator.
+      The efficiency of the OpenMP trials were gauged against a roofline model based on the physical characteristics of the accelerator.
       The NVIDIA P100 is theoretically capable of 9.3 SP TFLOPs/s/card\autocite{P100Datasheet}, whereas the NVIDIA K80 is theoretically capable of
-      8.74 TFLOPs/s/card\autocite{AnandtechK80}. In the event that KNL nodes on STAMPEDE2 are utilized, the theoretical roofline will
-      be considered as 1.4 GHz * 68 cores * 8 SIMD instructions/cycle (AVX512) = 761.6 GFLOPs/s/node\autocite{Stampede2UserGuide}\footnote{While KNL supports 4 threads/core, only 1 is considered here as performance may degrade over shared resources.}.
+      8.74 TFLOPs/s/card\autocite{AnandtechK80}. In the event that KNL nodes on STAMPEDE2 were utilized, the theoretical roofline would
+      be considered as 1.4 GHz * 68 cores * 8 SIMD instructions/cycle (AVX512) = 761.6 GFLOPs/s/node\autocite{Stampede2UserGuide}\footnote{While KNL supports 4 threads/core, only 1 was considered here as performance may degrade over shared resources.}.
     \end{paragraph}
     \begin{paragraph}{}
-      The matrix multiplication functions provided with the Intel Math Kernel Library (MKL) will be consulted as a reference for empirically
+      The matrix multiplication functions provided with the Intel Math Kernel Library (MKL) were consulted as a reference for empirically
       achievable single-node performance either without GPU acceleration or in the case of KNL nodes while the matrix multiplication sample provided
-      by the CUDA toolkit utilizing CUBLAS functions will be consulted as a reference for empirically achievable single-node performance
+      by the CUDA toolkit utilizing CUBLAS functions was consulted as a reference for empirically achievable single-node performance
       with GPU acceleration.
     \end{paragraph}
   \end{subsection}
   \begin{subsection}{Hypotheses}
-    I predict that the accelerated OpenMP solution will outperform the MPI solution for smaller matrix sizes until
+    It was predicted that the accelerated OpenMP solution would outperform the MPI solution for smaller matrix sizes until
     reaching an inflection point where the contention between resources within the node is a greater bottleneck than
-    the communication overhead across multiple nodes. This inflection point will largely depend on the architecture
+    the communication overhead across multiple nodes. This inflection point would largely depend on the architecture
     and layout of the accelerator used, i.e., the dimensions of the various hierarchical groupings of its compute resources.
   \end{subsection}
 \end{section}
@@ -84,12 +115,12 @@
     $C_{0} = \textbf{0}$ and validation trials would start with $C_{0} = [\textbf{0}\ \textbf{1}\ \ldots\ \textbf{m}]$.
   \end{paragraph}
   \begin{paragraph}{}
-    While this satisfies the desired formula $in + j$ per cell, it does not provide a checksum against column drift
+    While this satisfies the desired formula $in + j$ per cell, it did not provide a checksum against column drift
     since $B$ is simply a homogeneous field of ones. The basic principle could be improved as follows. Let each cell of the matrix
     $A$ be populated with the value $i + 1$. Let each cell of the matrix $B$ be populated with the value $j$. If a basis
-    of $C_{0}$ = \textbf{0} is assumed, each cell of the product matrix $C$ will contain the value $q(i + 1)j$, which expands to
-    $qij + qj$. By setting the basis matrix $C_{0}$ so that each cell contains $-((q-1)j + (j-1)iq)$ , each cell of the product matrix $C$
-    will then contain the desired value $iq + j$. This is a relatively safe method for obtaining the desired value since there are no
+    of $C_{0}$ = \textbf{0} were assumed, each cell of the product matrix $C$ would contain the value $q(i + 1)j$, which expands to
+    $qij + qj$. By setting the basis matrix $C_{0}$ so that each cell contained $-((q-1)j + (j-1)iq)$ , each cell of the product matrix $C$
+    would then contain the desired value $iq + j$. This is a relatively safe method for obtaining the desired value since there are no
     division operations required.
   \end{paragraph}
   \begin{paragraph}{}
@@ -100,8 +131,8 @@
     basis matrix $C_{0}$ with no guarantee of precision fidelity.
   \end{paragraph}
   \begin{paragraph}{}
-    Furthermore, the previous equation made an untenable assumption in view of the proposed target matrix sizes. The inner dimension $q$ is not
-    necessarily equal to the final column dimension $n$ of the matrix $C$. Such an invariant only holds if the matrices $A$ and $B$ are square.
+    Furthermore, the previous equation made an untenable assumption in view of the proposed target matrix sizes. The inner dimension $q$ might not
+    be equal to the final column dimension $n$ of the matrix $C$. Such an invariant only holds if the matrices $A$ and $B$ are square.
   \end{paragraph}
 \end{section}
 
@@ -132,20 +163,20 @@
     \begin{paragraph}{}
       The original source validated the CUBLAS results by calculating a reference solution on the host. Given the target matrix sizes involved, this could
       have become prohibitively expensive in terms of time cost, especially in early stage development on the author's local laptop machine.
-      This validation was made optional through the \texttt{validation} command-line argument. The default is to forgo validation, but validation of a sort
-      can be re-enabled by adding \texttt{validation=1} to the command-line call. At present, the only validation that is done is to seed the matrices $A$
-      and $B$ as homogeneous fields of ones, i.e., $A$ = \textbf{1} and $B$ = \textbf{1}. The validation simply checks that every cell of the product matrix
-      $C$ is set to $q$.
+      This validation was made optional through the \texttt{validation} command-line argument. The default was to forgo validation, but validation of a sort
+      could be re-enabled by adding \texttt{validation=1} to the command-line call. In the end, the only validation that was done was to seed the matrices $A$
+      and $B$ as homogeneous fields of ones, i.e., $A$ = \textbf{1} and $B$ = \textbf{1}. The validation simply checked that every cell of the product matrix
+      $C$ was set to $q$.
     \end{paragraph}
     \begin{paragraph}{}
-      The arguments \texttt{m}, \texttt{q}, and \texttt{n} can be any arbitrary integer, and no check is currently done for alignment against the CUDA card
-      except what may have existed in the original source. Since the target matrix sizes for the experiment are limited to powers of two (2), this is deemed
+      The arguments \texttt{m}, \texttt{q}, and \texttt{n} could be any arbitrary integer, and no check was done for alignment against the CUDA card
+      except what may have existed in the original source. Since the target matrix sizes for the experiment were limited to powers of two (2), this was deemed
       an acceptable risk.
     \end{paragraph}
     \begin{paragraph}{}
-      The output of the program has a fair amount of helpful human-readable information that is piped to \texttt{stderr}. Most of the \texttt{stderr} output
-      has its origins in the original source provided with the CUDA toolkit. On the other hand, output to \texttt{stdout} is reserved for machine-readable CSV text.
-      By convention, the output consists of the following columns:
+      The output of the program had a fair amount of helpful human-readable information that was piped to \texttt{stderr}. Most of the \texttt{stderr} output
+      had its origins in the original source provided with the CUDA toolkit. On the other hand, output to \texttt{stdout} was reserved for machine-readable CSV text.
+      By convention, the output consisted of the following columns:
       \begin{enumerate}
       \item{$m$, the row dimension of $A$ and $C$}
       \item{$q$, the column dimension of $A$ and the row dimension of $B$}
@@ -161,17 +192,17 @@
   \begin{subsection}{Scale-Out}
     \begin{paragraph}{}
       For the unaccelerated MPI or scale-out case, the Intel MKL libraries and their concomitant BLAS3 functions were selected as the empirical roofline model.
-      Since all of the scale-out cases will be run on nodes with Intel processors, it is assumed that the development staff at Intel has a more intimate knowledge
+      Since all of the scale-out cases would be run on nodes with Intel processors, it was assumed that the development staff at Intel had a more intimate knowledge
       of the processors involved than the general public and therefore should be better equipped to maximize resource utilization on these architectures.
     \end{paragraph}
     \begin{paragraph}{}
-      There is a slight difference in the methodology involved here from that employed in the scale-up case. Whereas the scale-up case looked at resource utilization
-      holistically with regard to the accelerator, the harness for the scale-out case will evaluate the single-core performance of the MKL BLAS3 function
-      \texttt{cblas\_sgemm}\autocite{MKLcblas\_sgemm}, and the roofline will be extrapolated along a strong-scaling model so that a scale-out case running with $p$
-      processors will be measured against the single-core rate multiplied by $p$ to determine its efficiency relative to MKL.
+      There was a slight difference in the methodology involved here from that employed in the scale-up case. Whereas the scale-up case looked at resource utilization
+      holistically with regard to the accelerator, the harness for the scale-out case would evaluate the single-core performance of the MKL BLAS3 function
+      \texttt{cblas\_sgemm}\autocite{MKLcblassgemm}, and the roofline would be extrapolated along a strong-scaling model so that a scale-out case running with $p$
+      processors would be measured against the single-core rate multiplied by $p$ to determine its efficiency relative to MKL.
     \end{paragraph}
     \begin{paragraph}{}
-      The sample code provided by Intel for \texttt{cblas\_sgemm}\autocite{MKLcblas\_sgemmx} was consulted as a reference for the scale-out single-core
+      The sample code provided by Intel for \texttt{cblas\_sgemm}\autocite{MKLcblassgemmx} was consulted as a reference for the scale-out single-core
       basis harness to validate correctness of the implementation, particularly the call to \texttt{cblas\_sgemm}, but the API documentation served as the
       primary resource that informed the implementation not only of the MKL library usage but the devising of command-line options as well. In fact, the
       command-line options of the scale-up harness were altered to match those of the scale-out harness for legibility and ease of batch scripting later.
@@ -185,10 +216,10 @@
       \end{subparagraph}
     \end{paragraph}
     \begin{paragraph}{}
-      The arguments provided to \texttt{-m}, \texttt{-q}, and \texttt{-n} can be any arbitrary integer.
+      The arguments provided to \texttt{-m}, \texttt{-q}, and \texttt{-n} could be any arbitrary integer.
     \end{paragraph}
     \begin{paragraph}{}
-      Output to \texttt{stdout} is reserved for machine-readable CSV text. By convention, the output consists of the following columns:
+      Output to \texttt{stdout} was reserved for machine-readable CSV text. By convention, the output consisted of the following columns:
       \begin{enumerate}
       \item{$m$, the row dimension of $A$ and $C$}
       \item{$q$, the column dimension of $A$ and the row dimension of $B$}
@@ -225,7 +256,7 @@
     \begin{paragraph}{}
       It was determined that a more rigorous examination of the parallelization was required. The ordering of the loop variables needed changing
       and a better understanding of OpenACC directives was sought.
-      After reviewing some tutorials on OpenACC parallelization techniques, some experiments with loop ordering were attempted and explicit
+      After reviewing some tutorials on OpenACC parallelization techniques\autocites{NoACCKernels,MMOptimizeOpenACC}, some experiments with loop ordering were attempted and explicit
       \texttt{\#pragma acc loop independent} directives were added in the more deeply nested loops. The alleged conflicts with \texttt{dA} and
       \texttt{dB} disappeared, but the outermost loops were still sequential. It was not until violating one of the most widely disseminated
       best practices, namely the avoidance of pointer arithmetic, that all the loops became parallelizable. After a quick verification check
@@ -364,40 +395,86 @@
       processors process each $i$-component simultaneously if not completely independently. It is with this version
       that final tests runs were executed.
     \end{paragraph}
+    \begin{paragraph}{}
+      To run this scale-up implementation of Cannon's algorithm, one would type the following command:
+      \begin{subparagraph}{}
+        \begin{alltt}
+          ./cannon-su -p \(p\) -m \(m\) -q \(q\) -n \(n\)
+        \end{alltt}
+      \end{subparagraph}
+    \end{paragraph}
+    \begin{paragraph}{}
+      By convention, the output consisted of the following columns:
+      \begin{enumerate}
+      \item{$p$, the number of processors in the processor grid}
+      \item{$m$, the row dimension of $A$ and $C$}
+      \item{$q$, the column dimension of $A$ and the row dimension of $B$}
+      \item{$n$, the column dimension of $B$ and $C$}
+      \item{$s$, the number of trials}
+      \item{$e$, the particular trial being measured}
+      \item{$f$, the number of flops per iteration (flops)}
+      \item{$r$, the achieved rate (gigaflops/sec)}
+      \item{$t_{mult}$, the average time spent per iteration on multiplication (ms)}
+      \item{$t_{comm}$, the time spent in host-to-device or device-to-host transfers (ms)}
+      \end{enumerate}
+    \end{paragraph}
   \end{subsection}
   \begin{subsection}{Scale-Out}
     \begin{paragraph}{}
       Development of the scale-out implementation borrowed the core of the scale-up OpenACC implementation and was ported
-      to use the MPI library functions. This port employed the RMA communication mechanism with Post-Start-Complete-Wait synchronization since
+      to use the MPI library functions. This port employed the RMA communication mechanism with Post-Start-Complete-Wait synchronization\autocite[][456-463]{MPIReport31} since
       the cyclic rotation between MPI processes must be marshalled in such a way that the present data is not overwritten.
     \end{paragraph}
     \begin{paragraph}{Array Distribution}
-      During program startup, the root process $P_{0,0}$ fills the arrays $A$, $B$, and $C$ and issues a \texttt{MPI\_Win\_post} call to \texttt{MPI\_COMM\_WORLD}
-      to notify the other processes and itself that the arrays are ready for retrieval. Each process $P_{x,y}$ issues a \texttt{MPI\_Get} request
+      During program startup, the root process $P_{0,0}$ filled the arrays $A$, $B$, and $C$ and issued a \texttt{MPI\_Win\_post} call to \texttt{MPI\_COMM\_WORLD}
+      to notify the other processes and itself that the arrays were ready for retrieval. Each process $P_{x,y}$ issued a \texttt{MPI\_Get} request
       to the root process $P_{0,0}$ for the properly sheared 2D subarrays $A_{x,(y+x)\ mod\ c}$ and $B_{(x+y)\ mod\ b, y}$ along with the stationary
-      2D subarray $C_{x,y}$. These are stored in individual process memory and opened via another RMA window so that the requisite neighbor processes
-      can access them during the cyclic rotation phases.
+      2D subarray $C_{x,y}$. These were stored in individual process memory and opened via another RMA window so that the requisite neighbor processes
+      could access them during the cyclic rotation phases.
     \end{paragraph}
     \begin{paragraph}{Cyclic Rotation}
-      Within each process, the memory allocated for the $A$ and $B$ subarrays is actually twice that required. This is to enable whole-block copying
-      between neighbor processes. The additional space serves as a send buffer during cyclic rotation and prevents corruption. Each process $P_{x,y}$
-      copies the entirety of the $A$ ($B$) submatrix and then issues a \texttt{MPI\_Win\_post} call for the corresponding window to a group comprised of
-      only its east (south) neighbor so that it can receive the other's copy of the corresponding submatrix. Immediately after the \texttt{MPI\_Post}
-      calls are sent, the process $P_{x,y}$ then issues a \texttt{MPI\_Win\_Start} call to its west (north) neighbor so that it can send its prior submatrix
-      $A$ ($B$) from the ghost block. Once that neighbor has posted its readiness, the process $P_{x,y}$ issues a \texttt{MPI\_Put} to deliver the data.
-      The transaction is finalized with a call to \texttt{MPI\_Win\_complete} on the corresponding window, and then the process issues a \texttt{MPI\_Win\_wait}
-      to block until it has assurance that its supplier has finished the incoming transaction before proceeding to the multiplication phase.
+      Within each process, the memory allocated for the $A$ and $B$ subarrays was actually twice that required. This was to enable whole-block copying
+      between neighbor processes. The additional space served as a send buffer during cyclic rotation and prevented corruption. Each process $P_{x,y}$
+      copied the entirety of the $A$ ($B$) submatrix and then issued a \texttt{MPI\_Win\_post} call for the corresponding window to a group comprised of
+      only its east (south) neighbor so that it could receive the other's copy of the corresponding submatrix. Immediately after the \texttt{MPI\_Post}
+      calls were sent, the process $P_{x,y}$ then issued a \texttt{MPI\_Win\_Start} call to its west (north) neighbor so that it could send its prior submatrix
+      $A$ ($B$) from the ghost block. Once that neighbor has posted its readiness, the process $P_{x,y}$ issued a \texttt{MPI\_Put} to deliver the data.
+      The transaction was finalized with a call to \texttt{MPI\_Win\_complete} on the corresponding window, and then the process issued a \texttt{MPI\_Win\_wait}
+      to block until it had assurance that its supplier had finished the incoming transaction before proceeding to the multiplication phase.
     \end{paragraph}
     \begin{paragraph}{Local Multiplication}
-      The local multiplication is implemented as a simple \emph{ikj} multiplication on the local process block. Some attempts were made to optimize it
+      The local multiplication was implemented as a simple \emph{ikj} multiplication on the local process block. Some attempts were made to optimize it
       with OpenMP, but the parallelizations turned out to be worse than the serial code in local development tests. In order to maximize the number
       of cores that could be devoted to the outward scaling with the minimum amount of node allocations, it was determined in the end to forgo any
-      thread parallelization within each MPI process. After each local multiplication is finished, the process $P_{x,y}$ loops until it has processed
+      thread parallelization within each MPI process. After each local multiplication was finished, the process $P_{x,y}$ looped until it has processed
       the block row $x$ and block column $y$ at most once.
     \end{paragraph}
     \begin{paragraph}{Collection}
-      When all the work has finished, the various processes report back to the root process via individual \texttt{MPI\_Put} calls to load balance
+      When all the work had finished, the various processes reported back to the root process via individual \texttt{MPI\_Put} calls to load balance
       the communication. Future work might include investigating whether a more complex call like \texttt{MPI\_Gather} would optimize the implementation.
+    \end{paragraph}
+    \begin{paragraph}{}
+      To run this scale-out implementation of Cannon's algorithm, one would type the following command:
+      \begin{subparagraph}{}
+        \begin{alltt}
+          mpirun -np \(p\) ./cannon-so -m \(m\) -q \(q\) -n \(n\)
+        \end{alltt}
+      \end{subparagraph}
+    \end{paragraph}
+    \begin{paragraph}{}
+      By convention, the output consisted of the following columns:
+      \begin{enumerate}
+      \item{$p$, the number of processors in the processor grid}
+      \item{$m$, the row dimension of $A$ and $C$}
+      \item{$q$, the column dimension of $A$ and the row dimension of $B$}
+      \item{$n$, the column dimension of $B$ and $C$}
+      \item{$s$, the number of trials}
+      \item{$e$, the particular trial being measured}
+      \item{$f$, the number of flops per iteration (flops)}
+      \item{$r$, the achieved rate (gigaflops/sec)}
+      \item{$t_{mult}$, the average time spent per iteration on multiplication (ms)}
+      \item{$t_{comm}$, the time spent in host-to-device or device-to-host transfers (ms)}
+      \end{enumerate}
     \end{paragraph}
   \end{subsection}
   \begin{subsection}{Data}
@@ -409,7 +486,603 @@
     have hardware optimization for multiplying certain numbers, for instance, powers of two.
   \end{subsection}
 \end{section}
-\end{section}
-\printbibliography
+\begin{section}{Results}
+  \begin{subsection}{mkl\_cblas\_sgemm}
+    \begin{paragraph}{}
+      The graph below depicts two sets of runs on the BRIDGES cluster with the \texttt{mkl\_cblas\_sgemm} harness.
+      The first run consisted of 30 trials whereas the second run only consisted of 10 trials.
+    \end{paragraph}
+    \begin{paragraph}{}
+      \begin{tikzpicture}
+        \begin{semilogxaxis}[
+            title=mkl\_cblas\_sgemm,
+            xmode=log,
+            log basis x=2,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=GF/s,
+            legend pos=outer north east,
+            legend entries={$s = 30$, $s = 10$}
+          ]
+          \addplot [brown] table [x=m, y=r]{\mklaveragesxxx};
+          \addplot [orange] table [x=m, y=r]{\mklaveragesx};
+        \end{semilogxaxis}
+      \end{tikzpicture}
+    \end{paragraph}
+    \begin{paragraph}{}
+      Curiously, the first run exhibited on average approximately double the performance of the second run. The author has no
+      ready explanation for this since the test was executed on the RM partition with a dedicated node, so there should not have
+      been any bleed from other jobs. It may be worth investigating in the future with a greater sample set, although the time
+      involved would be considerable.
+    \end{paragraph}
+    \begin{paragraph}{}
+      On grounds of statistical significance, the first run is potentially the better option to serve as a gauge, but its incompleteness
+      with regard to the $m=q=n=16384$ case makes it less viable. For the rest of this report, the numbers from the second run
+      of ten trials are used for comparison for the sake of completeness across all the target matrix dimensions.
+    \end{paragraph}
+  \end{subsection}
+  \begin{subsection}{matrixMulCUBLAS}
+    \begin{paragraph}{}
+      The graph below depicts runs on K80 and P100 nodes of the BRIDGES cluster with the \texttt{matrixMulCUBLAS} harness.
+      The dashed lines include the time for device-to-host and host-to-device transfers in the GF/s calculation.
+    \end{paragraph}
+    \begin{paragraph}{}
+      \begin{tikzpicture}
+        \begin{semilogxaxis}[
+            xmode=log,
+            title=matrixMulCUBLAS,
+            log basis x=2,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=GF/s,
+            legend pos=outer north east,
+            legend entries={K80,P100,K80,P100}
+          ]
+          \addplot [blue]
+          table [x=m, y=r]{\cublasaveragesk};
+          \addplot [green]
+          table [x=m, y=r]{\cublasaveragesp};
+          \addplot [blue,dashed]
+          table [x=m, y expr=\thisrow{flops}*1e-6/(\thisrow{tmult}+\thisrow{tcomm})]{\cublasaveragesk};
+          \addplot [green,dashed]
+          table [x=m, y expr=\thisrow{flops}*1e-6/(\thisrow{tmult}+\thisrow{tcomm})]{\cublasaveragesp};
+        \end{semilogxaxis}
+      \end{tikzpicture}
+    \end{paragraph}
+    \begin{paragraph}{}
+      On the surface, the CUBLAS implementation achieves nearly peak TPP using NVIDIA's own methodology of calculating the arithmetic rate
+      using only the multiplication time, particularly in the case of the P100. However, the entire system for dispatching and receiving
+      the calculation results is not comprised solely of the accelerator card, and the significant time cost incurred by transferring the
+      data to the card and back to the host should be reflected in the performance measurements, particularly when comparing against host-only
+      solutions such as \texttt{mkl\_cblas\_sgemm}.
+    \end{paragraph}
+  \end{subsection}
+
+  \begin{subsection}{Cannon's Algorithm}
+    % Cannon's Algorithm Performance
+    \begin{paragraph}{Performance}
+      The following set of graphs depicts the performance of Cannon's Algorithm in both the scale-up and scale-out variants.
+      Each graph tile represents the performance for a given square processor grid from 1 to 256 logical processors.
+      The solid lines represent the arithmetic rate calculated only against $t_{mult}$, the time for multiplication, while the dashed
+      lines represent the arithmetic rate calculated by including $t_{comm}$ as synchronization delay and therefore as a legitimate
+      damper on actual throughput.
+    \end{paragraph}
+    \begin{paragraph}{}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=2 by 3,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=2.5in,
+            width=2.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=GF/s,
+            xmode=log,
+            log basis x=2,
+            title={Cannon's Algorithm Performance}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs1] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs1] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,mark=none] table [x=m,y=p100gfs1] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm1}+\thisrow{e5tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm1}+\thisrow{k80tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm1}+\thisrow{p100tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs4] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs4] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100gfs4] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm4}+\thisrow{e5tc4})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm4}+\thisrow{k80tc4})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm4}+\thisrow{p100tc4})] {\cannonaverages};
+          \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs16] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs16] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100gfs16] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm16}+\thisrow{e5tc16})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm16}+\thisrow{k80tc16})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm16}+\thisrow{p100tc16})] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs64] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs64] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100gfs64] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm64}+\thisrow{e5tc64})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm64}+\thisrow{k80tc64})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm64}+\thisrow{p100tc64})] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs256] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs256] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100gfs256] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm256}+\thisrow{e5tc256})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm256}+\thisrow{k80tc256})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm256}+\thisrow{p100tc256})] {\cannonaverages};
+        \end{groupplot}
+        \node at(2,3) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+    \end{paragraph}
+    \begin{paragraph}{}
+      For the scale-up variant, the raw multiplication arithmetic rate appears not to vary with changes to the processor grid. When the
+      communication time between elements of the grid is factored in, the performance appears to degrade as the element count of the
+      processor grid increases. This suggests that the overhead of moving pieces of the matrices around is not worth the reduction in
+      size of the submatrices when the hardware is already so close together. Contrasting the performance against that of \texttt{matrixMulCUBLAS}
+      inexorably leads one to the conclusion that Cannon's algorithm is not at all suited for running within the confines of a single GPU accelerator.
+    \end{paragraph}
+    \begin{paragraph}{}
+      For the scale-out variant, the raw multiplication arithmetic increases proportional to the element count of the processor grid. There are
+      fairly substantial gains on the part of the scale-out variant from the single-processor case to the 256 processor 16x16 grid relative to itself.
+      As predicted, the scale-up variant handily outperforms the scale-out variant for smaller matrix sizes, but the scale-out variant come into
+      its own when it has a large processor grid at its disposal, and this shift is most visible in the largest matrix sizes.
+    \end{paragraph}
+    \begin{paragraph}{}
+      It was difficult to tell whether the partial validation of the initial hypothesis is entirely due to the factors that were considered
+      at the onset or if a part may be played by the poverty of the scale-up implementation. With only a coarse window into the GPU hardware through
+      the OpenACC directives and routines, the number of streaming processors actually doing the work in the single processor grid is unknown without
+      further investigation. The performance results suggest that the GPU is effectively running the same amount of processors regardless of the
+      logical processor grid size, probably as a result of the refinements to the OpenACC directives. In some sense, the attempt at implementing
+      Cannon's algorithm on the GPU through OpenACC only added communication overhead with every increase in grid size.
+    \end{paragraph}
+    \begin{paragraph}{}
+      That being said, there is definitely an upper limit on the amount of matrix that can be stored on a given GPU. While in theory the scale-out variant can
+      keep scaling indefinitely as long as there are nodes and network connections between them, its primary limit is the fact that multiple processors
+      cannot share a single matrix cell. Conversely, the developer is forced at some point with GPUs to either scale out to multiple GPUs or pipeline chunks
+      of the matrix through the single GPU if the matrix size exceeds its physical capacity.
+    \end{paragraph}
+    % Cannon's Algorithm Timing
+    \begin{paragraph}{Timing}
+      As an alternate view into the results from the test runs of the scale-up and scale-out variants, the following graph depicts the timings
+      that inform the previous performance graphs.
+    \end{paragraph}
+    \begin{paragraph}{}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=2 by 3,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=2.5in,
+            width=2.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=ms,
+            xmode=log,
+            log basis x=2,
+            ymode=log,
+            log basis y=10,
+            title={Cannon's Algorithm Timing}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm1] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695) $t_{mult}$};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm1] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80) $t_{mult}$};
+          \addplot [green,mark=none] table [x=m,y=p100tmm1] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100) $t_{mult}$};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc1] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695) $t_{comm}$};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc1] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80) $t_{comm}$};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc1] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100) $t_{comm}$};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm4] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm4] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100tmm4] {\cannonaverages};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc4] {\cannonaverages};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc4] {\cannonaverages};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc4] {\cannonaverages};
+          \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm16] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm16] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100tmm16] {\cannonaverages};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc16] {\cannonaverages};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc16] {\cannonaverages};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc16] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm64] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm64] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100tmm64] {\cannonaverages};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc64] {\cannonaverages};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc64] {\cannonaverages};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc64] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm256] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm256] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100tmm256] {\cannonaverages};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc256] {\cannonaverages};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc256] {\cannonaverages};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc256] {\cannonaverages};
+        \end{groupplot}
+        \node at(2,3) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+    \end{paragraph}
+    \begin{paragraph}{}
+      It may seem incongruous that a line for $t_{comm}$ appears in the 1x1 scale-out case, but even for this case,
+      the root process makes copies of $A$, $B$, and $C$ which it summarily gives itself to work from and dutifully
+      copies back $C$. No special logic was put in place to avoid this overhead.
+    \end{paragraph}
+    \begin{paragraph}{}
+      As the number of processors on the grid increases, the communication time begins to dominate until the
+      matrix size increases to a point so that the amount of multiplication compares to the amount of data movement.
+      The high cost of data movement becomes readily apparent when one considers the graphs and how many FLOPs are
+      required to match or exceed the cost of transferring data. This perfectly encapsulates the Achilles' heel of
+      Cannon's algorithm when it comes to performance. If one cannot minimize the constant communication cost,
+      the algorithm will slow to a crawl.
+    \end{paragraph}
+    % Cannon's Algorithm Efficiency Against TPP
+    \begin{paragraph}{Efficiency (TPP)}
+      The efficiency of the scale-up and scale-out variants against theoretical peak performance (TPP) is calculated by the following formulas\autocite[][14]{Lecture10Slides}:
+      \begin{subparagraph}{}
+        $E_{TPP} = \frac{2mqn/t_{mult}}{P*R_{TPP}}$ (solid lines)
+      \end{subparagraph}
+      \begin{subparagraph}{}
+        $E_{TPP} = \frac{2mqn/(t_{mult}+t_{comm})}{P*R_{TPP}}$ (dashed lines)
+      \end{subparagraph}
+    \end{paragraph}
+    \begin{paragraph}{}
+      With regard to TPP, the efficiency of both implementations of Cannon's algorithm is abysmal, barely reaching 0.2\%, and only the K80 runs at that.
+      The picture only worsens when one considers the communication time when calculating efficiency. It is interesting that the K80 would see the greatest
+      efficiency, even over that of the P100. This could be explained by the fact that the current version of the PGI compiler targets Tesla through the
+      \texttt{-ta=tesla,cuda-8.0} compiler flag. There is no similar flag for targeting Maxwell, Pascal, or, somewhat more understandably, Volta architectures.
+      As a result, the code generated by the PGI compiler is most likely optimized for the K80 and cannot fully take advantage of the architectural innovations
+      available in the hardware of the P100.
+    \end{paragraph}
+    \begin{paragraph}{}
+      Graphs of the efficiency against TPP for the various cases are given below.
+    \end{paragraph}
+    \begin{paragraph}{}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=2 by 3,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=2.5in,
+            width=2.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=Efficiency,
+            xmode=log,
+            log basis x=2,
+            title={Cannon's Algorithm Efficiency Against TPP}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs1}/257.6] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs1}/8740] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs1}/9300] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm1}+\thisrow{e5tc1})/257.6] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm1}+\thisrow{k80tc1})/8740] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm1}+\thisrow{p100tc1})/9300] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs4}/(4*257.6)] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs4}/8740] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs4}/9300] {\cannonaverages};
+           \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm4}+\thisrow{e5tc4})/(4*257.6)] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm4}+\thisrow{k80tc4})/8740] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm4}+\thisrow{p100tc4})/9300] {\cannonaverages};
+         \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs16}/(16*257.6)] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs16}/8740] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs16}/9300] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm16}+\thisrow{e5tc16})/(16*257.6)] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm16}+\thisrow{k80tc16})/8740] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm16}+\thisrow{p100tc16})/9300] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs64}/(64*257.6)] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs64}/8740] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs64}/9300] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm64}+\thisrow{e5tc64})/(64*257.6)] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm64}+\thisrow{k80tc64})/8740] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm64}+\thisrow{p100tc64})/9300] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs256}/(256*257.6)] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs256}/8740] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs256}/9300] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm256}+\thisrow{e5tc256})/(256*257.6)] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm256}+\thisrow{k80tc256})/8740] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm256}+\thisrow{p100tc256})/9300] {\cannonaverages};
+        \end{groupplot}
+        \node at(2,3) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+    \end{paragraph}
+    % Cannon's Algorithm Efficiency Against MKL
+    \begin{paragraph}{Efficiency (MKL)}
+      Even though the implementations of Cannon's algorithm have shown so far to have underutilized the computing resources available,
+      there are many reasons from operation imbalance to the inability to employ VLIW or SIMD tactics\autocite[][4-5]{Lecture10Slides}
+      as to why TPP is not practically achievable. It is often instructive to compare performance against the current state of the art
+      to get a gauge on whether a strategy is worth pursuing or refining any further. It is clear from previous graphs that CUBLAS is far
+      and away the optimal solution for the target matrix sizes discussed in this report, but it is worth examining whether the
+      parallelization of Cannon's algorithm offers any benefit over the MKL single-core algorithm. The following formula
+      is employed to provide a fair test of the true efficiency of the implementations\autocite[][14]{Lecture10Slides} under
+      the presumption that the \texttt{mkl\_cblas\_sgemm} is the state of the art for single-core, single-precision matrix multiplication.
+      Under a strong-scaling model, the best performance that can be reasonably expected is the rate of MKL's library function multiplied
+      by the number of processors unless serendipities in the hardware provide a superlinear speedup.
+      \begin{subparagraph}{}
+        $E_{MKL} = \frac{2mqn/(t_{mult}+t_{comm})}{P*R_{MKL}}$ (dashed lines)
+      \end{subparagraph}
+    \end{paragraph}
+    \begin{paragraph}{}
+      The equation involving only the multiplication time is not considered here since the communication overhead is an integral part
+      of the time cost for Cannon's algorithm. It would be an unfair comparison considering MKL has no appreciable communication cost
+      apart from that which may be incurred within the function call, and that cost is implicitly included in the measurements for
+      the multiplication time reported by the \texttt{mkl\_cblas\_sgemm} harness.
+    \end{paragraph}
+    \begin{paragraph}{}
+      Unfortunately, the efficiency calculated against a strong-scaling model using \texttt{mkl\_cblas\_sgemm} as the maximally
+      performant single-core baseline is not much better than that calculated against TPP. The peaks occur with few processors on
+      the grid at around 5-10\%, but as more processors are added, it becomes clear that the resources are not being optimally used,
+      and efficiency in the 256 processor 16x16 grid is at best around 0.8\%.
+    \end{paragraph}
+    \begin{paragraph}{}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=2 by 3,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=2.5in,
+            width=2.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=Efficiency,
+            xmode=log,
+            log basis x=2,
+            title={Cannon's Algorithm Efficiency Against MKL}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm1}+\thisrow{e5tc1})/(\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm1}+\thisrow{k80tc1})/(\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm1}+\thisrow{p100tc1})/(\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm4}+\thisrow{e5tc4})/(4*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm4}+\thisrow{k80tc4})/(4*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm4}+\thisrow{p100tc4})/(4*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm16}+\thisrow{e5tc16})/(16*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm16}+\thisrow{k80tc16})/(16*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm16}+\thisrow{p100tc16})/(16*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm64}+\thisrow{e5tc64})/(64*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm64}+\thisrow{k80tc64})/(64*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm64}+\thisrow{p100tc64})/(64*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm256}+\thisrow{e5tc256})/(256*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm256}+\thisrow{k80tc256})/(256*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm256}+\thisrow{p100tc256})/(256*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+        \end{groupplot}
+        \node at(2,3) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+    \end{paragraph}
+    % Cannon's Algorithm Speedup Against MKL
+    \begin{paragraph}{Speedup (MKL)}
+      Given the poor efficiency seen with regard to TPP and the single-core state of the art, it raises the question whether any speedup was achieved at all.
+      Good practice dictates that parallel speedup be calculated with respect to the fraction of the program that undergoes parallelization. Since the timings
+      measured only covered the actual matrix multiplication and the communication necessary to support that multiplication, the simple formula
+      $S_{MKL} = \frac{t_{MKL}}{t_{mult}+t_{comm}}$ should suffice to give an appropriate speedup factor relative to the \texttt{mkl\_cblas\_sgemm} implementation.
+      Again both the multiplication time and communication time are considered as integral and inextricable parts of the implementations of Cannon's algorithm
+      in both the scale-up and scale-out variants.
+    \end{paragraph}
+    \begin{paragraph}{}
+      As the graphs below demonstrate, the speedup results are nearly as unfavorable as the efficiency results. In all cases save one, the MKL version
+      outperformed all variants of the Cannon's algorithm implementations. The one counterexample was the 16384x16384 matrix case, and it required throwing
+      256 cores to cut the time in half that the MKL version took to achieve with one core. The expenditure in terms of resources does not justify the results.
+    \end{paragraph}
+    \begin{paragraph}{}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=2 by 3,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=2.5in,
+            width=2.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=Speedup,
+            xmode=log,
+            log basis x=2,
+            title={Cannon's Algorithm Speedup Against MKL}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm1}+\thisrow{e5tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm1}+\thisrow{k80tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm1}+\thisrow{p100tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm4}+\thisrow{e5tc4})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm4}+\thisrow{k80tc4})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm4}+\thisrow{p100tc4})] {\cannonaverages};
+          \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm16}+\thisrow{e5tc16})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm16}+\thisrow{k80tc16})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm16}+\thisrow{p100tc16})] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm64}+\thisrow{e5tc64})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm64}+\thisrow{k80tc64})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm64}+\thisrow{p100tc64})] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm256}+\thisrow{e5tc256})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm256}+\thisrow{k80tc256})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm256}+\thisrow{p100tc256})] {\cannonaverages};
+        \end{groupplot}
+        \node at(2,3) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+    \end{paragraph}
+  \end{subsection}
+  \end{section}
+  \begin{section}{Conclusions}
+    \begin{paragraph}{}
+      Based on the experimental process that was undertaken and the results gathered therefrom, it appears that Cannon's algorithm
+      as implemented was a poor choice for this exercise owing to the inflexibility of the algorithm as originally defined. A major
+      part of this shortcoming had its roots to the author's relative inexperience with OpenACC and MPI. There are likely better
+      means of structuring the communications so as not to occupy so much time and better ways to write the GPU directives.
+    \end{paragraph}
+    \begin{paragraph}{}
+      It would also have behooved the author to try and implement the generalized version of Cannon's algorithm covered in lecture
+      \autocite[][]{Lecture17Slides} rather than the more rigid block-oriented version as presented by Gupta and Sadayappan\autocite[][]{GuptaSadayappan}.
+      The former would likely have offered more opportunities for pipelining and enabled the author to pursue the stated goal of
+      covering the effect of the algorithm on matrices with extreme rectangular skew.
+    \end{paragraph}
+    \begin{paragraph}{}
+      That being said, the facilities within OpenACC and OpenMP leave quite a bit to be desired in terms of fine control over offloading
+      to accelerators. The last segment of the experimental process became more of a game of outwitting the compiler than setting the processor
+      grid up appropriately on the accelerator. In retrospect, CUDA would have probably been the better choice for implementing something so
+      structure-oriented as Cannon's algorithm on the GPU. It would have limited the program to running on NVIDIA GPUs, but that constraint
+      was already in place from the moment that \texttt{-ta=tesla} was put in the Makefile along with the NVIDIA specific device type directives
+      and initializers in the C source.
+    \end{paragraph}
+    \begin{paragraph}{}
+      As for the results received, it seems that Cannon's algorithm is better suited to the scale-out case in general. The algorithm more naturally
+      maps onto a MPI distributed memory framework rather than a shared memory model like OpenMP or OpenACC. One might be inclined to conclude that
+      pairing a distributed MPI network of GPU-accelerated nodes would give an implementation of the algorithm the necessary shot-in-the-arm, but the
+      frequency of communication would be exacerbated by a two-stage extraction from device to host and then host to network followed by the
+      laborious translation from network to target host and then to target GPU. Unless the GPU card was directly connected to other GPUs in the processor
+      network and transfers could be made on something faster than a PCI bus, the purported benefits would soon evaporate.
+    \end{paragraph}
+    \begin{paragraph}{}
+      Direction for future work could include a refactoring to either use the generalized form of Cannon's algorithm or perhaps another algorithm
+      altogether such as the Scalable Universal Matrix Multiplication Algorithm (SUMMA)\autocite[][]{WikiCannonAlgo} which is apparently used in
+      several linear algebra libraries. Furthermore, a better understanding of MPI communication and GPU processing contexts and minimizing the concomitant
+      overhead in both cases would prove valuable in future efforts, regardless of the algorithm chosen.
+    \end{paragraph}
+    \begin{paragraph}{}
+      Unfortunately, the facilities for taking power measurements were not fully available given the permissions restrictions on BRIDGES with respect
+      to the RAPL component of PAPI. Some thought was given to employing the \texttt{rapl\_read} executable wrapper in lieu of PAPI RAPL measurements
+      at the function level, but the strategy was rejected for lack of time and the author's uncertainty as to how such a wrapper would behave with
+      regard to the MPI scale-out case. A better solution in the form of a power-measurement library that could work within the context of production
+      cluster environments would provide some much-needed insight to this critical yet often overlooked component of software development.
+      This would be a fascinating research project in its own right and one sorely needed in light of the author's own experience.
+    \end{paragraph}
+  \end{section}
+
+  \begin{section}{Acknowledgments}
+    \begin{paragraph}{}
+      The author is indebted to the {\LaTeX} project\autocite{latexusrguide} and the following {\LaTeX} package and tutorial authors:
+      \begin{itemize}
+      \item{Dr. Christian Feuersänger for his excellent pgfplots\autocite{PgfplotsManual} and pgfplotstable\autocite{PgfplotstableManual} packages}
+      \item{Philip Lehman et al. for their contributions to the biblatex\autocite{BiblatexManual} package which provides a number of improvements over the venerable
+        but outdated bibtex\autocites{UsingBibTex,BibTexFormat} package}
+      \item{Philip Kime and François Charette for building the biber \autocite{BiberManual} backend for biblatex}
+      \item{Geoffrey M. Poore for the syntax highlighting made possible through his minted\autocite{MintedManual} package in conjunction with Pygments}
+      \item{David Carlisle for the fundamental enumerate\autocite{LaTeXEnumerate} package}
+      \item{Johannes Braams for the useful and flexible alltt\autocite{alltt} package}
+      \item{the anonymous contributors from the Wikimedia Project for maintaining the {\LaTeX} Wikibooks collection of tutorials\autocites{latexmathematics,latexliststructures,latexheaders,WikiBeamer}}
+      \item{Nadir Soualem and M. Tibbits for their helpful posts on getting Beamer to generate presentation slides\autocites{IntroToBeamer,BeamerSplitBiblio}}
+      \item{John Kormylo for his helpful response to a post on creating a common legend for pgfplots graphs\autocite{GroupLegend}}
+      \end{itemize}
+      The author is also indebted to Dr. Lennart Johnsson, Dr. Amit Amritkar, and Dr. Edgar Gabriel for their contribution to the lectures and instruction for the
+      Introduction to High Performance Computing course.
+      Finally, the author would like to thank his wife and daughter, as well as his employer, SixFoot LLC, for their patience, understanding, and support
+      of him in the pursuit of furthering his education.
+    \end{paragraph}
+  \end{section}
+
+  \begin{section}{Appendix A: Scale-Up Raw Results (K80)}
+    \pgfplotstabletypeset[header=true]{./results/cannon-su.2017-12-12.03.51.09.k80.csv}
+  \end{section}
+  \begin{section}{Appendix B: Scale-Up Raw Results (P100)}
+    \pgfplotstabletypeset[header=true]{./results/cannon-su.2017-12-11.21.35.28.p100.csv}
+  \end{section}
+  \begin{section}{Appendix C: Scale-Out Raw Results (E5-2695)}
+    \pgfplotstabletypeset[header=true]{./results/cannon-so.2017-12-11.22.03.55.csv}
+  \end{section}
+
+  \printbibliography
 
 \end{document}

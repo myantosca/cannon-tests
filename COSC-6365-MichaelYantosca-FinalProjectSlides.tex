@@ -10,6 +10,33 @@
 \usepackage[utf8]{luainputenc}
 \usepackage[bibencoding=utf8,backend=biber]{biblatex}
 \addbibresource{COSC-6365-MichaelYantosca-FinalProjectReport.bib}
+\usepackage{pgfplots}
+\usepackage{pgfplotstable}
+\usepgfplotslibrary{external}
+\usepgfplotslibrary{statistics}
+\usepgfplotslibrary{groupplots}
+\usetikzlibrary{external}
+\pgfplotsset{
+  tick label style={font=\tiny},
+%  label style={font=\tiny},
+  legend style={font=\tiny},
+  title style={font=\tiny},
+  xlabel style={font=\tiny},
+  ylabel style={font=\tiny}
+%  compat=newest
+}
+\pgfplotstableset{
+  col sep=comma,
+  begin table=\begin{longtable},
+  end table=\end{longtable},
+  every head row/.append style={after row=\endhead}
+}
+\pgfplotstableread{./results/cannon.avg.csv}\cannonaverages
+\pgfplotstableread{./results/mkl.avg.s30.csv}\mklaveragesxxx
+\pgfplotstableread{./results/mkl.avg.s10.csv}\mklaveragesx
+\pgfplotstableread{./results/cublas.avg.k80.csv}\cublasaveragesk
+\pgfplotstableread{./results/cublas.avg.p100.csv}\cublasaveragesp
+
 \begin{document}
 \begin{frame}
   \titlepage
@@ -87,7 +114,7 @@
 \end{frame}
 \begin{frame}{Hypotheses}
   \begin{itemize}
-  \item{OpenMP/OpenACC solution will outperform the MPI solution for smaller matrix sizes.}
+  \item{OpenMP\autocite{openmp45spec}/OpenACC\autocite{OpenACCStd} solution will outperform the MPI solution for smaller matrix sizes.}
   \item{Scale-Out will outperform Scale-Up when local contention for resources exceeds the communication overhead across nodes.}
   \item{The inflection point will depend on the hierarchical layout of the accelerator in use.}
     \begin{itemize}
@@ -174,9 +201,31 @@
       \begin{itemize}
       \item{Dependency on loop variables for matrix offset indexing.}
       \end{itemize}
-    \item{Still working out bugs.}
+    \item{Worked out remaining bugs and got a slight speedup compared to previous.}
+    \item{But...is this really Cannon's algorithm?}
     \end{itemize}
-\end{itemize}
+  \end{itemize}  
+\end{frame}
+\begin{frame}{Scale-Up: PGI Compiler Output}
+  \begin{alltt}
+  {\tiny
+      make[1]: Entering directory '/home/michael/cosc6365/final/src'\\
+      main:\\
+      215, Loop is parallelizable\\
+      217, Loop is parallelizable\\
+      219, Loop is parallelizable\\
+           Accelerator kernel generated\\
+           Generating Tesla code\\
+           \(i\) 215, \#pragma acc loop gang /* blockIdx.z */          \\
+           \(x\) 217, \#pragma acc loop gang /* blockIdx.y */          \\
+           \(y\) 219, \#pragma acc loop gang /* blockIdx.x */          \\
+           \(k\) 224, \#pragma acc loop seq                            \\
+           \(j\) 226, \#pragma acc loop vector(128) /* threadIdx.x */  \\
+      224, Loop is parallelizable\\
+      226, Loop is parallelizable\\
+      make[1]: Leaving directory '/home/michael/cosc6365/final/src'\\
+  }
+  \end{alltt}
 \end{frame}
 \begin{frame}{Scale-Up: Algorithmic Notes}
   \begin{itemize}
@@ -188,14 +237,14 @@
     \item{Subarrays are accessed by calculating the appropriate row-major offset.}
     \item{NB: Processor grid dimensions $x$ and $y$ start at 1.}
     \end{itemize}
-  \item{Local multiplication is implemented as a typical $ikj$ block multiplication.}
+  \item{Local multiplication is implemented as a typical $ikj$ multiplication.}
   \end{itemize}
 \end{frame}
 \begin{frame}{Scale-Out: Implementation}
   \begin{itemize}
   \item{Started with port of OpenACC scale-up implementation to MPI framework.}
   \item{Employed RMA communication between nodes for initial shearing and cyclic rotation.}
-  \item{Synchronization is Post-Start-Complete-Wait.}
+  \item{Synchronization is Post-Start-Complete-Wait\autocite[][456-463]{MPIReport31}.}
   \end{itemize}
 \end{frame}
 \begin{frame}{Scale-Out: Phase 0 (Allocation)}
@@ -225,18 +274,388 @@
         \item{$P_{x,y}$ sends its present copies of $dA$ and $dB$ to its west and north neighbors, respectively.}
         \item{$P_{x,y}$ awaits new copies of $dA$ and $dB$ from its east and south neighbors, respectively.}
         \end{itemize}
-      \item{All processes $P_{x,y}$ perform local $ikj$ block multiplication.}
+      \item{All processes $P_{x,y}$ perform local $ikj$ multiplication.}
       \end{itemize}
   \end{itemize}
 \end{frame}
-\begin{frame}{Conclusions?}
+\begin{frame}{MKL Results (Performance)}
+      \begin{tikzpicture}
+        \begin{semilogxaxis}[
+            title=mkl\_cblas\_sgemm,
+            xmode=log,
+            log basis x=2,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=GF/s,
+            legend pos=outer north east,
+            legend entries={$s = 30$, $s = 10$}
+          ]
+          \addplot [brown] table [x=m, y=r]{\mklaveragesxxx};
+          \addplot [orange] table [x=m, y=r]{\mklaveragesx};
+        \end{semilogxaxis}
+      \end{tikzpicture}
+\end{frame}
+\begin{frame}{CUBLAS Results (Performance)}
+      \begin{tikzpicture}
+        \begin{semilogxaxis}[
+            xmode=log,
+            title=matrixMulCUBLAS,
+            log basis x=2,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=GF/s,
+            legend pos=outer north east,
+            legend entries={K80,P100,K80,P100}
+          ]
+          \addplot [blue]
+          table [x=m, y=r]{\cublasaveragesk};
+          \addplot [green]
+          table [x=m, y=r]{\cublasaveragesp};
+          \addplot [blue,dashed]
+          table [x=m, y expr=\thisrow{flops}*1e-6/(\thisrow{tmult}+\thisrow{tcomm})]{\cublasaveragesk};
+          \addplot [green,dashed]
+          table [x=m, y expr=\thisrow{flops}*1e-6/(\thisrow{tmult}+\thisrow{tcomm})]{\cublasaveragesp};
+        \end{semilogxaxis}
+      \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cannon's Algorithm Results (Performance)}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=3 by 2,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=1.5in,
+            width=1.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=GF/s,
+            xmode=log,
+            log basis x=2,
+            title={Cannon's Algorithm Performance}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs1] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs1] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,mark=none] table [x=m,y=p100gfs1] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm1}+\thisrow{e5tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm1}+\thisrow{k80tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm1}+\thisrow{p100tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs4] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs4] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100gfs4] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm4}+\thisrow{e5tc4})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm4}+\thisrow{k80tc4})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm4}+\thisrow{p100tc4})] {\cannonaverages};
+          \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs16] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs16] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100gfs16] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm16}+\thisrow{e5tc16})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm16}+\thisrow{k80tc16})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm16}+\thisrow{p100tc16})] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs64] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs64] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100gfs64] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm64}+\thisrow{e5tc64})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm64}+\thisrow{k80tc64})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm64}+\thisrow{p100tc64})] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5gfs256] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80gfs256] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100gfs256] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm256}+\thisrow{e5tc256})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm256}+\thisrow{k80tc256})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm256}+\thisrow{p100tc256})] {\cannonaverages};
+        \end{groupplot}
+        \node at(1,1) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cannon's Algorithm Results (Timing)}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=3 by 2,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=1.5in,
+            width=1.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=ms,
+            xmode=log,
+            log basis x=2,
+            ymode=log,
+            log basis y=10,
+            title={Cannon's Algorithm Timing}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm1] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695) $t_{mult}$};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm1] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80) $t_{mult}$};
+          \addplot [green,mark=none] table [x=m,y=p100tmm1] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100) $t_{mult}$};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc1] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695) $t_{comm}$};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc1] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80) $t_{comm}$};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc1] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100) $t_{comm}$};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm4] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm4] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100tmm4] {\cannonaverages};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc4] {\cannonaverages};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc4] {\cannonaverages};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc4] {\cannonaverages};
+          \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm16] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm16] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100tmm16] {\cannonaverages};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc16] {\cannonaverages};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc16] {\cannonaverages};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc16] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm64] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm64] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100tmm64] {\cannonaverages};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc64] {\cannonaverages};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc64] {\cannonaverages};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc64] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y=e5tmm256] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y=k80tmm256] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y=p100tmm256] {\cannonaverages};
+          \addplot [red,mark=none,dashed] table [x=m,y=e5tc256] {\cannonaverages};
+          \addplot [blue,mark=none,dashed] table [x=m,y=k80tc256] {\cannonaverages};
+          \addplot [green,mark=none,dashed] table [x=m,y=p100tc256] {\cannonaverages};
+        \end{groupplot}
+        \node at(1,1) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cannon's Algorithm Results (Efficiency:TPP)}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=3 by 2,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=1.5in,
+            width=1.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=Efficiency,
+            xmode=log,
+            log basis x=2,
+            title={Cannon's Algorithm Efficiency Against TPP}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs1}/257.6] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs1}/8740] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs1}/9300] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm1}+\thisrow{e5tc1})/257.6] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm1}+\thisrow{k80tc1})/8740] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm1}+\thisrow{p100tc1})/9300] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs4}/(4*257.6)] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs4}/8740] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs4}/9300] {\cannonaverages};
+           \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm4}+\thisrow{e5tc4})/(4*257.6)] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm4}+\thisrow{k80tc4})/8740] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm4}+\thisrow{p100tc4})/9300] {\cannonaverages};
+         \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs16}/(16*257.6)] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs16}/8740] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs16}/9300] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm16}+\thisrow{e5tc16})/(16*257.6)] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm16}+\thisrow{k80tc16})/8740] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm16}+\thisrow{p100tc16})/9300] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs64}/(64*257.6)] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs64}/8740] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs64}/9300] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm64}+\thisrow{e5tc64})/(64*257.6)] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm64}+\thisrow{k80tc64})/8740] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm64}+\thisrow{p100tc64})/9300] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,mark=none] table [x=m,y expr=\thisrow{e5gfs256}/(256*257.6)] {\cannonaverages};
+          \addplot [blue,mark=none] table [x=m,y expr=\thisrow{k80gfs256}/8740] {\cannonaverages};
+          \addplot [green,mark=none] table [x=m,y expr=\thisrow{p100gfs256}/9300] {\cannonaverages};
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{e5tmm256}+\thisrow{e5tc256})/(256*257.6)] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{k80tmm256}+\thisrow{k80tc256})/8740] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}*1e-6/(\thisrow{p100tmm256}+\thisrow{p100tc256})/9300] {\cannonaverages};
+        \end{groupplot}
+        \node at(1,1) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cannon's Algorithm Results (Efficiency:MKL)}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=3 by 2,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=1.5in,
+            width=1.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=Efficiency,
+            xmode=log,
+            log basis x=2,
+            title={Cannon's Algorithm Efficiency Against MKL}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm1}+\thisrow{e5tc1})/(\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm1}+\thisrow{k80tc1})/(\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm1}+\thisrow{p100tc1})/(\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm4}+\thisrow{e5tc4})/(4*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm4}+\thisrow{k80tc4})/(4*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm4}+\thisrow{p100tc4})/(4*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm16}+\thisrow{e5tc16})/(16*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm16}+\thisrow{k80tc16})/(16*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm16}+\thisrow{p100tc16})/(16*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm64}+\thisrow{e5tc64})/(64*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm64}+\thisrow{k80tc64})/(64*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm64}+\thisrow{p100tc64})/(64*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{e5tmm256}+\thisrow{e5tc256})/(256*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{k80tmm256}+\thisrow{k80tc256})/(256*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{flops}/(\thisrow{p100tmm256}+\thisrow{p100tc256})/(256*\thisrow{flops}/\thisrow{mkltmm1})] {\cannonaverages};
+        \end{groupplot}
+        \node at(1,1) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+\end{frame}
+\begin{frame}{Cannon's Algorithm Results (Speedup:MKL)}
+      \begin{tikzpicture}
+        \begin{groupplot}[
+            group style={
+              group size=3 by 2,
+              xlabels at=edge bottom,
+              ylabels at=edge left
+            },
+            height=1.5in,
+            width=1.5in,
+            xlabel=Matrix Size ($n \times n$),
+            ylabel=Speedup,
+            xmode=log,
+            log basis x=2,
+            title={Cannon's Algorithm Speedup Against MKL}
+          ]
+          \nextgroupplot[group/empty plot]
+          \nextgroupplot[
+            title={1x1 Processor Grid},
+            legend to name=variants
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm1}+\thisrow{e5tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Out (E5-2695)};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm1}+\thisrow{k80tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (K80)};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm1}+\thisrow{p100tc1})] {\cannonaverages};
+          \addlegendentry{Scale-Up (P100)};
+          \nextgroupplot[
+            title={2x2 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm4}+\thisrow{e5tc4})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm4}+\thisrow{k80tc4})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm4}+\thisrow{p100tc4})] {\cannonaverages};
+          \nextgroupplot[
+            title={4x4 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm16}+\thisrow{e5tc16})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm16}+\thisrow{k80tc16})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm16}+\thisrow{p100tc16})] {\cannonaverages};
+          \nextgroupplot[
+            title={8x8 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm64}+\thisrow{e5tc64})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm64}+\thisrow{k80tc64})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm64}+\thisrow{p100tc64})] {\cannonaverages};
+          \nextgroupplot[
+            title={16x16 Processor Grid},
+          ]
+          \addplot [red,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{e5tmm256}+\thisrow{e5tc256})] {\cannonaverages};
+          \addplot [blue,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{k80tmm256}+\thisrow{k80tc256})] {\cannonaverages};
+          \addplot [green,dashed] table [x=m,y expr=\thisrow{mkltmm1}/(\thisrow{p100tmm256}+\thisrow{p100tc256})] {\cannonaverages};
+        \end{groupplot}
+        \node at(1,1) {\pgfplotslegendfromname{variants}};
+      \end{tikzpicture}
+\end{frame}
+\begin{frame}{Conclusions}
   \begin{itemize}
   \item{Don't get stuck in the realm of sunk-cost fallacy.}
     \begin{itemize}
       \item{Know when to cut losses and move on.}
     \end{itemize}
-  \item{Local block multiplication makes it extremely difficult to generalize Cannon's algorithm to non-square matrices.}
-  \item{Experimental results still pending.}
+  \item{Local multiplication makes it extremely difficult to generalize Cannon's algorithm to non-square matrices.}
+  \item{Cannon's algorithm seems better suited for scale-out implementations. Use CUBLAS for GPU.}
+  \item{The communication cost makes implementing the algorithm difficult to justify unless node communications are implemented in a supremely efficient manner.} 
   \end{itemize}
 \end{frame}
 \begin{frame}[allowframebreaks]{References}
