@@ -47,7 +47,7 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  fprintf(stdout, "m,q,n,s,r,r_iter,t_iter\n");
+  fprintf(stdout, "m,q,n,s,r,f,t_mult\n");
   struct timeval tv_a;
   struct timeval tv_b;
   long long int t_total = 0;
@@ -60,9 +60,9 @@ int main(int argc, char *argv[]) {
   }
 
   double r_iter = 2.0 * m * n * q;
-  double t_iter = (double)t_total * 0.001 / (double)s;
-  double r = r_iter * 1.0e-9 / (t_iter * 0.001);
-  fprintf(stdout, "%d,%d,%d,%d,%.2lf,%.3lf,%.3lf\n", m, q, n, s, r, r_iter, t_iter);
+  double t_mult = (double)t_total * 0.001 / (double)s;
+  double r = r_iter * 1.0e-9 / (t_mult * 0.001);
+  fprintf(stdout, "%d,%d,%d,%d,%.2lf,%.3lf,%.3lf\n", m, q, n, s, r, r_iter, t_mult);
 
   if (A) free(A);
   if (B) free(B);

@@ -295,7 +295,7 @@ int matrixMultiply(int argc, char **argv, int devID, sMatrixSize &matrix_size)
 	}
     }
 
-    fprintf(stdout, "m,q,n,s,r,r_iter,t_iter,t_comm\n");
+    fprintf(stdout, "m,q,n,s,r,f,t_mult,t_comm\n");
     // allocate device memory
     float *d_A, *d_B, *d_C;
 
