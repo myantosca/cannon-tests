@@ -208,7 +208,7 @@
       Initial development on the scale-up implementation of Cannon's algorithm began with OpenMP. Some difficulties were encountered with regard
       to the offset math required for setting up a non-square 2D grid which delayed development of the parallelization. Once the problem was
       reduced to the square target matrix sizes, it was realized that part of the problem was the failure to enforce the rigidity of the grid dimensions
-      and coupled with a misreading of the algorithm description with regard to the initial shearing of phase 1.
+      coupled with a misreading of the algorithm description with regard to the initial shearing of phase 1.
     \end{paragraph}
     \begin{paragraph}{}
       An additional hurdle was encountered when it became clear that OpenMP GPU offloading was not enabled with either gcc or icc on the intended
@@ -218,74 +218,73 @@
       parallel loop support eliminated GCC from consideration.
     \end{paragraph}
     \begin{paragraph}{}
-      As it stands right now, the OpenACC implementation is functional, but not at all performant. There are some additional modifications to be made
-      to take advantage of acceleration, primarily in the block multiplication phase. Presently, the pgcc compiler is only adding serial accelerated
-      loops because of loop variable dependencies.
+      Initially, the OpenACC implementation was thought to be functional if not performant. However, there were additional logic errors in the
+      offset math that needed to be corrected along with further modifications to take advantage of the GPU acceleration, primarily in the block
+      multiplication phase. First attempts with the pgcc compiler only added serial loops on the GPU because of complex loop variable dependencies.
     \end{paragraph}
     \begin{paragraph}{}
-      It was determined that a more rigorous examination of the parallelization would be required. The ordering of the loop variables would likely
-      need changing, and a better understanding of OpenACC directives was sought.
-
+      It was determined that a more rigorous examination of the parallelization was required. The ordering of the loop variables needed changing
+      and a better understanding of OpenACC directives was sought.
       After reviewing some tutorials on OpenACC parallelization techniques, some experiments with loop ordering were attempted and explicit
       \texttt{\#pragma acc loop independent} directives were added in the more deeply nested loops. The alleged conflicts with \texttt{dA} and
       \texttt{dB} disappeared, but the outermost loops were still sequential. It was not until violating one of the most widely disseminated
       best practices, namely the avoidance of pointer arithmetic, that all the loops became parallelizable. After a quick verification check
       that the results were valid for a small case, the smallest target matrix size was tested under a nvprof wrapper with the following results:
-      \begin{alltt}
-        {\footnotesize
-          michael@aphelion ~/cosc6365/final $ nvprof ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
-          ==12882== NVPROF is profiling process 12882, command: ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
-          16,256,256,256,1,33554432.00,0.00,1319.012,82.073
-          ==12882== Profiling application: ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
-          ==12882== Profiling result:
-          Time(%)      Time     Calls       Avg       Min       Max  Name
-          99.00%  1.31888s         4  329.72ms  326.65ms  337.61ms  main_356_gpu
-          0.61%  8.1765ms      2049  3.9900us  3.6800us  169.38us  [CUDA memcpy HtoD]
-          0.37%  4.9208ms      5144     956ns     896ns  10.432us  [CUDA memcpy DtoD]
-          0.01%  160.00us         1  160.00us  160.00us  160.00us  [CUDA memcpy DtoH]
-
-          ==12882== API calls:
-          Time(%)      Time     Calls       Avg       Min       Max  Name
-          85.39%  1.33983s      2054  652.30us  4.1210us  337.62ms  cuStreamSynchronize
-          6.29%  98.630ms         1  98.630ms  98.630ms  98.630ms  cuDevicePrimaryCtxRetain
-          4.16%  65.316ms         1  65.316ms  65.316ms  65.316ms  cuDevicePrimaryCtxRelease
-          1.86%  29.147ms      5144  5.6660us  5.0490us  325.27us  cuMemcpyDtoDAsync
-          1.03%  16.215ms         1  16.215ms  16.215ms  16.215ms  cuMemHostAlloc
-          0.59%  9.2858ms         1  9.2858ms  9.2858ms  9.2858ms  cuMemFreeHost
-          0.41%  6.4971ms      2049  3.1700us  2.9330us  23.480us  cuMemcpyHtoDAsync
-          0.17%  2.7347ms     10288     265ns     211ns  2.7000us  cuPointerGetAttributes
-          0.04%  695.98us         4  174.00us  3.9990us  241.37us  cuMemAlloc
-          0.03%  409.59us         1  409.59us  409.59us  409.59us  cuMemAllocHost
-          0.01%  149.14us         1  149.14us  149.14us  149.14us  cuModuleLoadData
-          0.00%  32.707us         4  8.1760us  6.7910us  10.511us  cuLaunchKernel
-          0.00%  21.719us         1  21.719us  21.719us  21.719us  cuStreamCreate
-          0.00%  20.038us         1  20.038us  20.038us  20.038us  cuMemcpyDtoHAsync
-          0.00%  5.6230us         2  2.8110us     454ns  5.1690us  cuEventCreate
-          0.00%  2.5610us         1  2.5610us  2.5610us  2.5610us  cuEventRecord
-          0.00%  2.2920us         3     764ns     163ns  1.7650us  cuDeviceGetCount
-          0.00%  1.8190us         3     606ns     293ns  1.0710us  cuCtxSetCurrent
-          0.00%  1.3030us         3     434ns     272ns     731ns  cuDeviceGet
-          0.00%  1.1740us         1  1.1740us  1.1740us  1.1740us  cuModuleGetFunction
-          0.00%  1.1310us         4     282ns     250ns     338ns  cuDeviceGetAttribute
-          0.00%  1.0130us         1  1.0130us  1.0130us  1.0130us  cuEventSynchronize
-          0.00%     317ns         1     317ns     317ns     317ns  cuMemFree
-          0.00%     292ns         1     292ns     292ns     292ns  cuCtxGetCurrent
-          0.00%     289ns         1     289ns     289ns     289ns  cuDeviceComputeCapability
-
-          ==12882== OpenACC (excl):
-          Time(%)      Time     Calls       Avg       Min       Max  Name
-          91.10%  1.31913s         5  263.83ms  210.04us  337.63ms  acc_wait@byteswap.h:356
-          6.87%  99.469ms         1  99.469ms  99.469ms  99.469ms  acc_device_init
-          1.50%  21.778ms      2049  10.628us  4.7710us  171.59us  acc_wait
-          0.52%  7.5036ms      2049  3.6620us  3.4070us  29.945us  acc_enqueue_upload
-          0.00%  44.429us         4  11.107us  9.2100us  14.338us  acc_enqueue_launch@byteswap.h:356 (main_356_gpu)
-          0.00%  34.080us         1  34.080us  34.080us  34.080us  acc_enqueue_download@byteswap.h:356
-          0.00%  29.343us         4  7.3350us  5.5510us  12.177us  acc_compute_construct@byteswap.h:356
-          0.00%       0ns         3       0ns       0ns       0ns  acc_delete@(OpenACC API):1
-          0.00%       0ns         3       0ns       0ns       0ns  acc_alloc@(OpenACC API):1
-        }
-      \end{alltt}
     \end{paragraph}
+    \begin{alltt}
+      {\footnotesize
+        michael@aphelion ~/cosc6365/final $ nvprof ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
+        ==12882== NVPROF is profiling process 12882, command: ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
+        16,256,256,256,1,33554432.00,0.00,1319.012,82.073
+        ==12882== Profiling application: ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
+        ==12882== Profiling result:
+        Time(%)      Time     Calls       Avg       Min       Max  Name
+        99.00%  1.31888s         4  329.72ms  326.65ms  337.61ms  main_356_gpu
+        0.61%  8.1765ms      2049  3.9900us  3.6800us  169.38us  [CUDA memcpy HtoD]
+        0.37%  4.9208ms      5144     956ns     896ns  10.432us  [CUDA memcpy DtoD]
+        0.01%  160.00us         1  160.00us  160.00us  160.00us  [CUDA memcpy DtoH]
+
+        ==12882== API calls:
+        Time(%)      Time     Calls       Avg       Min       Max  Name
+        85.39%  1.33983s      2054  652.30us  4.1210us  337.62ms  cuStreamSynchronize
+        6.29%  98.630ms         1  98.630ms  98.630ms  98.630ms  cuDevicePrimaryCtxRetain
+        4.16%  65.316ms         1  65.316ms  65.316ms  65.316ms  cuDevicePrimaryCtxRelease
+        1.86%  29.147ms      5144  5.6660us  5.0490us  325.27us  cuMemcpyDtoDAsync
+        1.03%  16.215ms         1  16.215ms  16.215ms  16.215ms  cuMemHostAlloc
+        0.59%  9.2858ms         1  9.2858ms  9.2858ms  9.2858ms  cuMemFreeHost
+        0.41%  6.4971ms      2049  3.1700us  2.9330us  23.480us  cuMemcpyHtoDAsync
+        0.17%  2.7347ms     10288     265ns     211ns  2.7000us  cuPointerGetAttributes
+        0.04%  695.98us         4  174.00us  3.9990us  241.37us  cuMemAlloc
+        0.03%  409.59us         1  409.59us  409.59us  409.59us  cuMemAllocHost
+        0.01%  149.14us         1  149.14us  149.14us  149.14us  cuModuleLoadData
+        0.00%  32.707us         4  8.1760us  6.7910us  10.511us  cuLaunchKernel
+        0.00%  21.719us         1  21.719us  21.719us  21.719us  cuStreamCreate
+        0.00%  20.038us         1  20.038us  20.038us  20.038us  cuMemcpyDtoHAsync
+        0.00%  5.6230us         2  2.8110us     454ns  5.1690us  cuEventCreate
+        0.00%  2.5610us         1  2.5610us  2.5610us  2.5610us  cuEventRecord
+        0.00%  2.2920us         3     764ns     163ns  1.7650us  cuDeviceGetCount
+        0.00%  1.8190us         3     606ns     293ns  1.0710us  cuCtxSetCurrent
+        0.00%  1.3030us         3     434ns     272ns     731ns  cuDeviceGet
+        0.00%  1.1740us         1  1.1740us  1.1740us  1.1740us  cuModuleGetFunction
+        0.00%  1.1310us         4     282ns     250ns     338ns  cuDeviceGetAttribute
+        0.00%  1.0130us         1  1.0130us  1.0130us  1.0130us  cuEventSynchronize
+        0.00%     317ns         1     317ns     317ns     317ns  cuMemFree
+        0.00%     292ns         1     292ns     292ns     292ns  cuCtxGetCurrent
+        0.00%     289ns         1     289ns     289ns     289ns  cuDeviceComputeCapability
+
+        ==12882== OpenACC (excl):
+        Time(%)      Time     Calls       Avg       Min       Max  Name
+        91.10%  1.31913s         5  263.83ms  210.04us  337.63ms  acc_wait@byteswap.h:356
+        6.87%  99.469ms         1  99.469ms  99.469ms  99.469ms  acc_device_init
+        1.50%  21.778ms      2049  10.628us  4.7710us  171.59us  acc_wait
+        0.52%  7.5036ms      2049  3.6620us  3.4070us  29.945us  acc_enqueue_upload
+        0.00%  44.429us         4  11.107us  9.2100us  14.338us  acc_enqueue_launch@byteswap.h:356 (main_356_gpu)
+        0.00%  34.080us         1  34.080us  34.080us  34.080us  acc_enqueue_download@byteswap.h:356
+        0.00%  29.343us         4  7.3350us  5.5510us  12.177us  acc_compute_construct@byteswap.h:356
+        0.00%       0ns         3       0ns       0ns       0ns  acc_delete@(OpenACC API):1
+        0.00%       0ns         3       0ns       0ns       0ns  acc_alloc@(OpenACC API):1
+      }
+    \end{alltt}
     \begin{paragraph}{}
       The modifications garnered roughly 4 times better performance than prior attempts. As evidenced by the nvprof output,
       the bulk of time was being spent in \texttt{acc\_wait}, an implicit synchronization emplaced to protect the contents
@@ -293,79 +292,82 @@
       how to reduce the rather significant amount of context swapping.
     \end{paragraph}
     \begin{paragraph}{}
-      A quick experiment in swapping the \texttt{\#pragma acc parallel} \texttt{\#pragma acc kernels} immediately doubled the performance.
+      A quick experiment in replacing the \texttt{\#pragma acc parallel} directive with \texttt{\#pragma acc kernels} immediately doubled the performance.
       Another brief experiment in reverting to $ijk$ multiplication and leveraging the \texttt{\#pragma acc loop reduction} directive\autocite[][2]{WolfePGI} revealed
-      a disappointing truth: the program ran fastest when $p$ was set to 1, i.e., no communication between blocks. It is becoming clear
-      that the attempt to save on memory costs by allocating as one large block is defeating the benefits by block allocation since the
-      data will not be block-local for the streaming processors if $b$ and $c$ are to be kernel dimensions.
+      a disappointing truth: the program ran fastest when $p$ was set to 1, i.e., no communication between blocks. The attempt to save on
+      memory costs and, in theory, time, by allocating the device copies of the matrices $A$, $B$, and $C$ as one large block each seemed
+      to defeat the expected benefits of Cannon's algorithm and its promise of allocation of relevant data close to the processors involved.
     \end{paragraph}
     \begin{paragraph}{}
       Further experimentation with precalculating offsets yielded promising results. By moving to an $ixykj$ loop model and precalculating
       the parts of the offsets pertaining to $i$, $x$, and $y$ in the $y$ loop, performance was greatly improved.
-      \begin{alltt}
-        {\footnotesize
-          michael@aphelion ~/cosc6365/final $ nvprof ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
-          ==8811== NVPROF is profiling process 8811, command: ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
-          16,256,256,256,1,33554432.00,0.00,136.267,81.453
-          ==8811== Profiling application: ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
-          ==8811== Profiling result:
-          Time(%)      Time     Calls       Avg       Min       Max  Name
-          91.06%  136.17ms         4  34.042ms  31.990ms  35.053ms  main_344_gpu
-          5.38%  8.0485ms      2049  3.9280us  3.6800us  169.38us  [CUDA memcpy HtoD]
-          3.45%  5.1647ms      5144  1.0040us     896ns  14.912us  [CUDA memcpy DtoD]
-          0.11%  160.80us         1  160.80us  160.80us  160.80us  [CUDA memcpy DtoH]
-
-          ==8811== API calls:
-          Time(%)      Time     Calls       Avg       Min       Max  Name
-          40.09%  156.51ms      2054  76.199us  3.9950us  35.060ms  cuStreamSynchronize
-          27.05%  105.60ms         1  105.60ms  105.60ms  105.60ms  cuDevicePrimaryCtxRetain
-          16.28%  63.552ms         1  63.552ms  63.552ms  63.552ms  cuDevicePrimaryCtxRelease
-          7.37%  28.755ms      5144  5.5900us  5.0030us  363.46us  cuMemcpyDtoDAsync
-          4.05%  15.824ms         1  15.824ms  15.824ms  15.824ms  cuMemHostAlloc
-          2.42%  9.4366ms         1  9.4366ms  9.4366ms  9.4366ms  cuMemFreeHost
-          1.69%  6.6098ms      2049  3.2250us  2.9770us  23.551us  cuMemcpyHtoDAsync
-          0.70%  2.7276ms     10288     265ns     208ns  13.388us  cuPointerGetAttributes
-          0.18%  719.74us         4  179.93us  4.3360us  264.30us  cuMemAlloc
-          0.10%  405.40us         1  405.40us  405.40us  405.40us  cuMemAllocHost
-          0.04%  158.18us         1  158.18us  158.18us  158.18us  cuModuleLoadData
-          0.01%  44.311us         1  44.311us  44.311us  44.311us  cuStreamCreate
-          0.01%  26.994us         4  6.7480us  5.5120us  9.2010us  cuLaunchKernel
-          0.01%  19.681us         3  6.5600us  1.0700us  17.235us  cuDeviceGet
-          0.00%  11.049us         1  11.049us  11.049us  11.049us  cuMemcpyDtoHAsync
-          0.00%  5.9280us         3  1.9760us     486ns  3.7500us  cuDeviceGetCount
-          0.00%  3.9700us         4     992ns     821ns  1.4170us  cuDeviceGetAttribute
-          0.00%  2.9060us         2  1.4530us     469ns  2.4370us  cuEventCreate
-          0.00%  2.1130us         1  2.1130us  2.1130us  2.1130us  cuEventRecord
-          0.00%  1.9380us         3     646ns     257ns  1.2730us  cuCtxSetCurrent
-          0.00%  1.2690us         1  1.2690us  1.2690us  1.2690us  cuModuleGetFunction
-          0.00%  1.0160us         1  1.0160us  1.0160us  1.0160us  cuEventSynchronize
-          0.00%     941ns         1     941ns     941ns     941ns  cuDeviceComputeCapability
-          0.00%     903ns         1     903ns     903ns     903ns  cuCtxGetCurrent
-          0.00%     429ns         1     429ns     429ns     429ns  cuMemFree
-
-          ==8811== OpenACC (excl):
-          Time(%)      Time     Calls       Avg       Min       Max  Name
-          50.16%  136.42ms         5  27.284ms  223.56us  35.061ms  acc_wait@byteswap.h:344
-          39.15%  106.47ms         1  106.47ms  106.47ms  106.47ms  acc_device_init
-          7.84%  21.312ms      2049  10.401us  4.8300us  169.38us  acc_wait
-          2.83%  7.7034ms      2049  3.7590us  3.5020us  29.916us  acc_enqueue_upload
-          0.01%  35.966us         4  8.9910us  7.1280us  12.875us  acc_enqueue_launch@byteswap.h:344 (main_344_gpu)
-          0.01%  20.712us         4  5.1780us  2.8470us  10.060us  acc_compute_construct@byteswap.h:339
-          0.01%  20.466us         1  20.466us  20.466us  20.466us  acc_enqueue_download@byteswap.h:344
-          0.00%       0ns         3       0ns       0ns       0ns  acc_delete@(OpenACC API):1
-          0.00%       0ns         3       0ns       0ns       0ns  acc_alloc@(OpenACC API):1
-        }
-      \end{alltt}
     \end{paragraph}
+    \begin{alltt}
+      {\footnotesize
+        michael@aphelion ~/cosc6365/final $ nvprof ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
+        ==8811== NVPROF is profiling process 8811, command: ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
+        16,256,256,256,1,33554432.00,0.00,136.267,81.453
+        ==8811== Profiling application: ./cannon-su-acc -p 16 -m 256 -q 256 -n 256
+        ==8811== Profiling result:
+        Time(%)      Time     Calls       Avg       Min       Max  Name
+        91.06%  136.17ms         4  34.042ms  31.990ms  35.053ms  main_344_gpu
+        5.38%  8.0485ms      2049  3.9280us  3.6800us  169.38us  [CUDA memcpy HtoD]
+        3.45%  5.1647ms      5144  1.0040us     896ns  14.912us  [CUDA memcpy DtoD]
+        0.11%  160.80us         1  160.80us  160.80us  160.80us  [CUDA memcpy DtoH]
+
+        ==8811== API calls:
+        Time(%)      Time     Calls       Avg       Min       Max  Name
+        40.09%  156.51ms      2054  76.199us  3.9950us  35.060ms  cuStreamSynchronize
+        27.05%  105.60ms         1  105.60ms  105.60ms  105.60ms  cuDevicePrimaryCtxRetain
+        16.28%  63.552ms         1  63.552ms  63.552ms  63.552ms  cuDevicePrimaryCtxRelease
+        7.37%  28.755ms      5144  5.5900us  5.0030us  363.46us  cuMemcpyDtoDAsync
+        4.05%  15.824ms         1  15.824ms  15.824ms  15.824ms  cuMemHostAlloc
+        2.42%  9.4366ms         1  9.4366ms  9.4366ms  9.4366ms  cuMemFreeHost
+        1.69%  6.6098ms      2049  3.2250us  2.9770us  23.551us  cuMemcpyHtoDAsync
+        0.70%  2.7276ms     10288     265ns     208ns  13.388us  cuPointerGetAttributes
+        0.18%  719.74us         4  179.93us  4.3360us  264.30us  cuMemAlloc
+        0.10%  405.40us         1  405.40us  405.40us  405.40us  cuMemAllocHost
+        0.04%  158.18us         1  158.18us  158.18us  158.18us  cuModuleLoadData
+        0.01%  44.311us         1  44.311us  44.311us  44.311us  cuStreamCreate
+        0.01%  26.994us         4  6.7480us  5.5120us  9.2010us  cuLaunchKernel
+        0.01%  19.681us         3  6.5600us  1.0700us  17.235us  cuDeviceGet
+        0.00%  11.049us         1  11.049us  11.049us  11.049us  cuMemcpyDtoHAsync
+        0.00%  5.9280us         3  1.9760us     486ns  3.7500us  cuDeviceGetCount
+        0.00%  3.9700us         4     992ns     821ns  1.4170us  cuDeviceGetAttribute
+        0.00%  2.9060us         2  1.4530us     469ns  2.4370us  cuEventCreate
+        0.00%  2.1130us         1  2.1130us  2.1130us  2.1130us  cuEventRecord
+        0.00%  1.9380us         3     646ns     257ns  1.2730us  cuCtxSetCurrent
+        0.00%  1.2690us         1  1.2690us  1.2690us  1.2690us  cuModuleGetFunction
+        0.00%  1.0160us         1  1.0160us  1.0160us  1.0160us  cuEventSynchronize
+        0.00%     941ns         1     941ns     941ns     941ns  cuDeviceComputeCapability
+        0.00%     903ns         1     903ns     903ns     903ns  cuCtxGetCurrent
+        0.00%     429ns         1     429ns     429ns     429ns  cuMemFree
+
+        ==8811== OpenACC (excl):
+        Time(%)      Time     Calls       Avg       Min       Max  Name
+        50.16%  136.42ms         5  27.284ms  223.56us  35.061ms  acc_wait@byteswap.h:344
+        39.15%  106.47ms         1  106.47ms  106.47ms  106.47ms  acc_device_init
+        7.84%  21.312ms      2049  10.401us  4.8300us  169.38us  acc_wait
+        2.83%  7.7034ms      2049  3.7590us  3.5020us  29.916us  acc_enqueue_upload
+        0.01%  35.966us         4  8.9910us  7.1280us  12.875us  acc_enqueue_launch@byteswap.h:344 (main_344_gpu)
+        0.01%  20.712us         4  5.1780us  2.8470us  10.060us  acc_compute_construct@byteswap.h:339
+        0.01%  20.466us         1  20.466us  20.466us  20.466us  acc_enqueue_download@byteswap.h:344
+        0.00%       0ns         3       0ns       0ns       0ns  acc_delete@(OpenACC API):1
+        0.00%       0ns         3       0ns       0ns       0ns  acc_alloc@(OpenACC API):1
+      }
+    \end{alltt}
     \begin{paragraph}{}
       Under this $ixykj$ regimen, the \texttt{\#pragma acc loop reduction} directive around the $k$ loop was replaced with a
       \texttt{\#pragma acc loop independent} directive since perfunctory tests with it revealed a decrease in performance
-      when attempting an $ixyjk$ reduction model of parallelism.
+      when attempting an $ixyjk$ reduction model of parallelism. It is questionable whether the technique and its loop
+      arrangement can be called strictly Cannon's algorithm, though one might envision it as one where all the individual
+      processors process each $i$-component simultaneously if not completely independently. It is with this version
+      that final tests runs were executed.
     \end{paragraph}
   \end{subsection}
   \begin{subsection}{Scale-Out}
     \begin{paragraph}{}
-      Development of the scale-out implementation borrowed the core of the OpenACC implementation from the scale-up implementation and was ported
+      Development of the scale-out implementation borrowed the core of the scale-up OpenACC implementation and was ported
       to use the MPI library functions. This port employed the RMA communication mechanism with Post-Start-Complete-Wait synchronization since
       the cyclic rotation between MPI processes must be marshalled in such a way that the present data is not overwritten.
     \end{paragraph}
@@ -387,16 +389,26 @@
       to block until it has assurance that its supplier has finished the incoming transaction before proceeding to the multiplication phase.
     \end{paragraph}
     \begin{paragraph}{Local Multiplication}
-      The local multiplication is implemented as a simple \emph{ikj} block multiplication. Some attempts have been made to optimize it
-      with OpenMP, but the parallelizations have turned out to be worse than the serial in local development tests.
-      After each local multiplication is finished, the process $P\_{x,y}$ loops until it has processed the block row $x$ and block column $y$
-      at most once.
+      The local multiplication is implemented as a simple \emph{ikj} multiplication on the local process block. Some attempts were made to optimize it
+      with OpenMP, but the parallelizations turned out to be worse than the serial code in local development tests. In order to maximize the number
+      of cores that could be devoted to the outward scaling with the minimum amount of node allocations, it was determined in the end to forgo any
+      thread parallelization within each MPI process. After each local multiplication is finished, the process $P_{x,y}$ loops until it has processed
+      the block row $x$ and block column $y$ at most once.
     \end{paragraph}
     \begin{paragraph}{Collection}
       When all the work has finished, the various processes report back to the root process via individual \texttt{MPI\_Put} calls to load balance
-      the communication. It remains to be seen whether a more complex call like \texttt{MPI\_Gather} can be used to optimize the implementation.
+      the communication. Future work might include investigating whether a more complex call like \texttt{MPI\_Gather} would optimize the implementation.
     \end{paragraph}
   \end{subsection}
+  \begin{subsection}{Data}
+    It should be noted at this point that the test runs were not executed with random numbers as initially planned. Due to an oversight by the author,
+    the performance trials for both the scale-up and scale-out versions were executed with each prospective block of the matrices filled with a block
+    identifier which ran in sequence according to the row-major offset ordering of the C-programming language if one envisioned the matrix partitioned
+    into a 2D array of blocks based on the number of processes. The refactoring to populate the matrices $A$ and $B$ random numbers was simply forgotten
+    before trials began in earnest. The effect should be marginal but might be noticed in certain cases if the FPUs handling the multiplication
+    have hardware optimization for multiplying certain numbers, for instance, powers of two.
+  \end{subsection}
+\end{section}
 \end{section}
 \printbibliography
 
